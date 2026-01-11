@@ -5,76 +5,38 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Cali Votes — Checkout</title>
   <link rel="stylesheet" href="style.css" />
-  <script src="config.js"></script>
-  <script src="app.js"></script>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card">
+  <main class="wrap">
+    <section class="card">
       <h1>Checkout</h1>
-      <p>Pay the amount below, then upload your screenshot. We’ll review and approve your votes.</p>
+      <p class="muted">Pay the amount below, then upload your proof.</p>
 
-      <div id="summary" class="notice"></div>
-      <div class="hr"></div>
-
-      <div id="qrWrap" style="text-align:center"></div>
-
-      <div class="row" style="margin-top:14px">
-        <button id="paid">I paid — upload proof</button>
-        <button class="secondary" id="back">Back</button>
+      <div class="stack" style="margin-top:12px;">
+        <div><span class="muted">City:</span> <b id="pay_city">—</b></div>
+        <div><span class="muted">Votes:</span> <b id="pay_votes">—</b></div>
+        <div><span class="muted">Amount due:</span> <b id="pay_amount">—</b></div>
+        <div><span class="muted">Payment method:</span> <b id="pay_method">—</b></div>
       </div>
 
-      <p class="small">If you need to leave this page, you’ll also get an email with your upload link after you click “I paid”.</p>
-
-      <div class="footer">
-        <a href="leaderboard.html">Leaderboard</a>
-        <a href="upload_entry.html">I already paid earlier</a>
+      <div style="margin-top:14px;">
+        <img id="pay_qr" style="max-width:320px;border-radius:14px;border:1px solid rgba(255,255,255,.14);display:none;" />
       </div>
-    </div>
-  </div>
 
-<script>
-  const s = getSession();
-  if (!s.session_token) location.href="register.html";
+      <p id="msg" class="msg" style="margin-top:12px;"></p>
 
-  const city = (qs("city")||"").trim();
-  const votes = Number(qs("votes")||0);
-  const pm = (qs("pm")||"").trim();
-  if (!city || !votes || !pm) location.href="vote.html";
+      <div class="row" style="gap:12px; margin-top:14px;">
+        <button id="createSubmission" class="btn" type="button">I’ve paid — Continue to Upload</button>
+        <a class="btn secondary" href="vote.html">Back</a>
+      </div>
 
-  const amt = votes * 5;
-  document.getElementById("summary").innerHTML =
-    `<b>${esc(city)}</b><br>${esc(String(votes))} vote(s) • <b>$${amt}</b> • ${esc(pm)}`;
+      <div class="row" style="gap:12px; margin-top:10px;">
+        <a class="btn secondary" href="upload_entry.html">Already have proof? Upload now</a>
+      </div>
+    </section>
+  </main>
 
-  const { ASSET_BASE } = cfg();
-  const qrMap = {
-    "CashApp": ASSET_BASE + "/cashapp-qr.png",
-    "Venmo":  ASSET_BASE + "/venmo-qr.png",
-    "SOL":    ASSET_BASE + "/sol-qr.png",
-    "ETH":    ASSET_BASE + "/eth-qr.png",
-    "BTC":    ASSET_BASE + "/btc-qr.png"
-  };
-  const qr = qrMap[pm] || "";
-  document.getElementById("qrWrap").innerHTML = qr
-    ? `<img class="qr" src="${esc(qr)}" alt="Payment QR" />`
-    : `<div class="notice err">Missing QR for ${esc(pm)} — check config ASSET_BASE and filenames.</div>`;
-
-  document.getElementById("back").onclick = ()=> history.back();
-
-  document.getElementById("paid").onclick = async ()=>{
-    const res = await post("submitVote", {
-      session_token: s.session_token,
-      email: s.email,
-      name_optional: s.name_optional,
-      discord_handle_optional: s.discord_handle_optional,
-      city,
-      votes_claimed: votes,
-      payment_method_selected: pm
-    });
-    if (res.error) return alert(res.error);
-    // redirect straight to upload for momentum
-    location.href = res.upload_url;
-  };
-</script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
