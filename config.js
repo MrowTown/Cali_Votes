@@ -1,6 +1,19 @@
-// Cali Votes config
-// Set these AFTER you deploy Apps Script + GitHub Pages.
-window.CALI_VOTES = {
-  EXEC_URL: "https://script.google.com/macros/s/AKfycbxoGbVDc90uokYkCl0jo8lFznSM6oTfz2a7YyKHHp9DjRBKl8zQ_jMSssW-zs83m1e_8g/exec", // ends with /exec
-  ASSET_BASE: "PASTE_YOUR_GITHUB_PAGES_ASSET_BASE_HERE" // e.g. https://YOURUSER.github.io/Cali_Votes/assets
-};
+// config.js — Cali Votes config (REQUIRED)
+
+(function () {
+  const EXEC_URL = "https://script.google.com/macros/s/AKfycbxoGbVDc90uokYkCl0jo8lFznSM6oTfz2a7YyKHHp9DjRBKl8zQ_jMSssW-zs83m1e_8g/exec";
+  const ASSET_BASE = "https://MrowTown.github.io/Cali_Votes/assets";
+
+  // --- safety checks (catch typos like phttps) ---
+  function mustBeHttps(url, name) {
+    const s = String(url || "").trim();
+    if (!s || s.includes("PASTE_")) throw new Error(`Config missing: ${name}`);
+    if (!s.startsWith("https://")) throw new Error(`Config invalid: ${name} must start with https:// (got: ${s.slice(0, 12)}...)`);
+    return s;
+  }
+
+  window.CALI_VOTES = {
+    EXEC_URL: mustBeHttps(EXEC_URL, "CALI_VOTES.EXEC_URL"),
+    ASSET_BASE: mustBeHttps(ASSET_BASE, "CALI_VOTES.ASSET_BASE")
+  };
+})();

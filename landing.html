@@ -5,37 +5,25 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Cali Votes — Landing</title>
   <link rel="stylesheet" href="style.css" />
-  <script src="config.js"></script>
-  <script src="app.js"></script>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card">
-      <h1>Cali Reign is going on tour.</h1>
-      <p>Want her to come to <b>your</b> town? Vote today — <b>$5 = 1 vote</b>. Your vote gets counted once you upload proof of payment.</p>
+  <main class="wrap">
+    <section class="card">
+      <h1>Cali Reign Tour Votes</h1>
+      <p id="status" class="muted">
+        If you’re arriving from an email link, we’ll verify you automatically…
+      </p>
 
-      <div class="hr"></div>
-
-      <button id="start">Vote for Cali</button>
-
-      <div class="footer">
-        <a href="leaderboard.html">View leaderboard</a>
-        <a href="upload_entry.html">Already paid? Upload proof</a>
-        <a href="#" id="logout" style="margin-left:auto">Not you? Clear saved email</a>
+      <div class="row" style="gap:12px; margin-top:14px;">
+        <a class="btn" href="register.html">Register / Get verification link</a>
+        <a class="btn secondary" href="upload_entry.html">Already paid? Upload proof</a>
+        <a class="btn secondary" href="leaderboard.html">View leaderboard</a>
       </div>
-    </div>
-  </div>
+    </section>
+  </main>
 
-<script>
-  document.getElementById("start").addEventListener("click", ()=>{
-    const s = getSession();
-    location.href = s.session_token ? "vote.html" : "register.html";
-  });
-  document.getElementById("logout").addEventListener("click", (e)=>{
-    e.preventDefault();
-    clearSession();
-    alert("Cleared.");
-  });
-</script>
+  <!-- Load config first, then app -->
+  <script src="config.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
