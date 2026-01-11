@@ -1,0 +1,144 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cali Votes — Admin</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:#0b0b0f;color:#fff}
+    .wrap{max-width:1100px;margin:0 auto;padding:18px}
+    .card{background:#141420;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px}
+    input,select,button{border-radius:12px;border:1px solid rgba(255,255,255,.14);background:#0f0f18;color:#fff;padding:10px 12px}
+    button{cursor:pointer;font-weight:800;background:#ff2da6;color:#000;border:none}
+    button.secondary{background:#222236;color:#fff;border:1px solid rgba(255,255,255,.14)}
+    button.danger{background:#ff245a;color:#fff}
+    table{width:100%;border-collapse:collapse;margin-top:14px}
+    th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);font-size:13px;vertical-align:top}
+    th{text-align:left;color:rgba(255,255,255,.75);font-weight:800}
+    a{color:#7bd3ff}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    .pill{display:inline-block;padding:3px 8px;border-radius:999px;font-size:12px;font-weight:800}
+    .pending{background:rgba(255,255,255,.08)}
+    .approved{background:rgba(0,255,170,.12);border:1px solid rgba(0,255,170,.25)}
+    .rejected{background:rgba(255,0,80,.12);border:1px solid rgba(255,0,80,.25)}
+    .muted{opacity:.75}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h2 style="margin:0 0 10px;">Cali Votes — Admin</h2>
+      <div class="row">
+        <input id="pw" type="password" placeholder="Admin password" style="min-width:240px" />
+        <select id="filter">
+          <option value="pending_with_proof" selected>Pending + proof uploaded</option>
+          <option value="pending_all">All pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <button id="refresh">Refresh</button>
+        <span class="muted" id="count"></span>
+      </div>
+      <div id="err" class="muted" style="margin-top:10px;"></div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Created</th><th>Email</th><th>City</th><th>Votes</th><th>Status</th><th>Proof</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+<script>
+  let EXEC_URL = "";
+  const pw = document.getElementById("pw");
+  const filter = document.getElementById("filter");
+  const refreshBtn = document.getElementById("refresh");
+  const tbody = document.getElementById("tbody");
+  const count = document.getElementById("count");
+  const err = document.getElementById("err");
+
+  function esc(s){return String(s||"").replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));}
+  function pill(status){
+    const cls = status==="approved"?"approved":status==="rejected"?"rejected":"pending";
+    return `<span class="pill ${cls}">${esc(status)}</span>`;
+  }
+
+  async function api(action, payload){
+    const res = await fetch(EXEC_URL, {
+      method:"POST",
+      headers:{ "Content-Type":"text/plain;charset=utf-8" },
+      body: JSON.stringify({ action, ...payload })
+    });
+    const t = await res.text();
+    try { return JSON.parse(t); } catch { return { error:t }; }
+  }
+
+  async function load(){
+    err.textContent = "";
+    tbody.innerHTML = `<tr><td colspan="7" class="muted">Loading…</td></tr>`;
+    const res = await api("adminList", { password: pw.value, filter: filter.value });
+    if (res.error){
+      tbody.innerHTML = `<tr><td colspan="7" class="muted">—</td></tr>`;
+      err.textContent = res.error;
+      return;
+    }
+    const rows = res.rows || [];
+    count.textContent = rows.length ? `${rows.length} row(s)` : "";
+    tbody.innerHTML = rows.length ? rows.map(r=>{
+      const proof = r.screenshot_drive_url ? `<a href="${esc(r.screenshot_drive_url)}" target="_blank" rel="noopener">open</a>` : `<span class="muted">none</span>`;
+      return `<tr data-id="${esc(r.submission_id)}">
+        <td>${esc(r.created_at)}</td>
+        <td>${esc(r.email)}</td>
+        <td>${esc(r.city)}</td>
+        <td><b>${esc(r.votes_claimed)}</b></td>
+        <td>${pill(r.status)}</td>
+        <td>${proof}</td>
+        <td>
+          <div class="row" style="gap:8px;">
+            <button class="approve">Approve</button>
+            <button class="danger reject">Reject</button>
+            <button class="secondary copyid">Copy ID</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join("") : `<tr><td colspan="7" class="muted">No rows.</td></tr>`;
+  }
+
+  tbody.addEventListener("click", async (e)=>{
+    const tr = e.target.closest("tr[data-id]");
+    if (!tr) return;
+    const submissionId = tr.getAttribute("data-id");
+    if (e.target.classList.contains("copyid")){
+      await navigator.clipboard.writeText(submissionId);
+      return;
+    }
+    if (e.target.classList.contains("approve")){
+      const res = await api("approve",{ password: pw.value, submissionId });
+      if (res.error) return err.textContent=res.error;
+      return load();
+    }
+    if (e.target.classList.contains("reject")){
+      const reason = prompt("Reason (optional):") || "";
+      const res = await api("reject",{ password: pw.value, submissionId, reason });
+      if (res.error) return err.textContent=res.error;
+      return load();
+    }
+  });
+
+  refreshBtn.addEventListener("click", load);
+  filter.addEventListener("change", load);
+
+  pw.value = localStorage.getItem("cali_admin_pw") || "";
+  pw.addEventListener("input", ()=> localStorage.setItem("cali_admin_pw", pw.value));
+
+  google.script.url.getLocation(function(loc) {
+    EXEC_URL = (loc && loc.href ? loc.href : "").split("?")[0];
+    load();
+  });
+</script>
+</body>
+</html>

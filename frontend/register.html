@@ -1,0 +1,109 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cali Votes — Register</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Voter registration</h1>
+      <p>We’ll email you a quick verification code. This helps prevent spam and makes sure your vote gets credited correctly.</p>
+
+      <div id="msg" class="notice" style="display:none"></div>
+
+      <form id="f">
+        <div class="row">
+          <div>
+            <label>Name (optional)</label>
+            <input id="name" placeholder="Cali Fan #1" autocomplete="name"/>
+          </div>
+          <div>
+            <label>Discord handle (optional)</label>
+            <input id="discord" placeholder="@yourhandle" autocomplete="off"/>
+          </div>
+        </div>
+
+        <label>Email (required)</label>
+        <input id="email" type="email" required placeholder="you@example.com" autocomplete="email"/>
+
+        <div class="row" style="margin-top:14px">
+          <button type="submit">Send verification code</button>
+          <button type="button" class="secondary" id="back">Back</button>
+        </div>
+      </form>
+
+      <div class="hr"></div>
+
+      <div id="codeBox" style="display:none">
+        <label>Verification code</label>
+        <input id="code" inputmode="numeric" placeholder="6-digit code" maxlength="6" />
+        <div class="row" style="margin-top:14px">
+          <button id="verify">Verify & continue</button>
+          <button class="secondary" id="resend" type="button">Resend</button>
+        </div>
+        <p class="small">Code expires quickly. If you don’t see it, check spam/promotions.</p>
+      </div>
+
+      <div class="footer">
+        <a href="leaderboard.html">Leaderboard</a>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const msg = document.getElementById("msg");
+  const show = (type, html)=>{ msg.className="notice "+type; msg.innerHTML=html; msg.style.display="block"; };
+
+  const f = document.getElementById("f");
+  const name = document.getElementById("name");
+  const discord = document.getElementById("discord");
+  const email = document.getElementById("email");
+  const codeBox = document.getElementById("codeBox");
+  const code = document.getElementById("code");
+
+  document.getElementById("back").onclick = ()=> location.href="landing.html";
+
+  // preload from storage
+  const s = getSession();
+  if (s.email) email.value = s.email;
+  if (s.name_optional) name.value = s.name_optional;
+  if (s.discord_handle_optional) discord.value = s.discord_handle_optional;
+
+  async function request(){
+    msg.style.display="none";
+    const res = await post("requestEmailCode", {
+      email: email.value,
+      name_optional: name.value,
+      discord_handle_optional: discord.value
+    });
+    if (res.error) return show("err", "<b>Error:</b> "+esc(res.error));
+    saveSession({ email: email.value, name_optional: name.value, discord_handle_optional: discord.value, session_token: "" });
+    codeBox.style.display="block";
+    show("ok", "Sent a verification code to <b>"+esc(email.value)+"</b>.");
+    code.focus();
+  }
+
+  f.addEventListener("submit", async (e)=>{ e.preventDefault(); await request(); });
+  document.getElementById("resend").addEventListener("click", request);
+
+  document.getElementById("verify").addEventListener("click", async (e)=>{
+    e.preventDefault();
+    msg.style.display="none";
+    const res = await post("verifyEmailCode", {
+      email: email.value,
+      code: code.value,
+      name_optional: name.value,
+      discord_handle_optional: discord.value
+    });
+    if (res.error) return show("err", "<b>Error:</b> "+esc(res.error));
+    saveSession(res);
+    location.href = "vote.html";
+  });
+</script>
+</body>
+</html>

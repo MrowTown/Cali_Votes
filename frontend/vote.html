@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cali Votes — Vote</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Cast your vote</h1>
+      <p class="small">Signed in as <span id="who"></span></p>
+
+      <div id="msg" class="notice" style="display:none"></div>
+
+      <label>City</label>
+      <input id="city" placeholder="e.g., New York City" />
+
+      <div class="row">
+        <div>
+          <label>Votes</label>
+          <input id="votes" type="number" min="1" value="1" />
+          <p class="small">$5 per vote</p>
+        </div>
+        <div>
+          <label>Payment method</label>
+          <select id="pm">
+            <option value="CashApp">CashApp</option>
+            <option value="Venmo">Venmo</option>
+            <option value="SOL">SOL</option>
+            <option value="ETH">ETH</option>
+            <option value="BTC">BTC</option>
+          </select>
+          <p class="small">You’ll get a checkout page with the QR.</p>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:14px">
+        <button id="continue">Continue to checkout</button>
+        <button class="secondary" id="back">Back</button>
+      </div>
+
+      <div class="footer">
+        <a href="upload_entry.html">Already paid? Upload proof</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <a href="#" id="logout" style="margin-left:auto">Log out</a>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const s = getSession();
+  const who = document.getElementById("who");
+  who.textContent = s.email ? s.email : "(not signed in)";
+  if (!s.session_token) location.href = "register.html";
+
+  document.getElementById("back").onclick = ()=> location.href="landing.html";
+  document.getElementById("logout").onclick = (e)=>{ e.preventDefault(); clearSession(); location.href="landing.html"; };
+
+  document.getElementById("continue").onclick = ()=>{
+    const city = document.getElementById("city").value.trim();
+    const votes = Number(document.getElementById("votes").value);
+    const pm = document.getElementById("pm").value;
+    if (!city) return alert("City required.");
+    if (!votes || votes < 1) return alert("Votes must be 1+.");
+    const q = new URLSearchParams({ city, votes: String(votes), pm }).toString();
+    location.href = "pay.html?"+q;
+  };
+</script>
+</body>
+</html>

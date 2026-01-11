@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cali Votes — Landing</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Cali Reign is going on tour.</h1>
+      <p>Want her to come to <b>your</b> town? Vote today — <b>$5 = 1 vote</b>. Your vote gets counted once you upload proof of payment.</p>
+
+      <div class="hr"></div>
+
+      <button id="start">Vote for Cali</button>
+
+      <div class="footer">
+        <a href="leaderboard.html">View leaderboard</a>
+        <a href="upload_entry.html">Already paid? Upload proof</a>
+        <a href="#" id="logout" style="margin-left:auto">Not you? Clear saved email</a>
+      </div>
+    </div>
+  </div>
+
+<script>
+  document.getElementById("start").addEventListener("click", ()=>{
+    const s = getSession();
+    location.href = s.session_token ? "vote.html" : "register.html";
+  });
+  document.getElementById("logout").addEventListener("click", (e)=>{
+    e.preventDefault();
+    clearSession();
+    alert("Cleared.");
+  });
+</script>
+</body>
+</html>
