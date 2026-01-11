@@ -1,144 +1,349 @@
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Cali Votes — Admin</title>
-  <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:#0b0b0f;color:#fff}
-    .wrap{max-width:1100px;margin:0 auto;padding:18px}
-    .card{background:#141420;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px}
-    input,select,button{border-radius:12px;border:1px solid rgba(255,255,255,.14);background:#0f0f18;color:#fff;padding:10px 12px}
-    button{cursor:pointer;font-weight:800;background:#ff2da6;color:#000;border:none}
-    button.secondary{background:#222236;color:#fff;border:1px solid rgba(255,255,255,.14)}
-    button.danger{background:#ff245a;color:#fff}
-    table{width:100%;border-collapse:collapse;margin-top:14px}
-    th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);font-size:13px;vertical-align:top}
-    th{text-align:left;color:rgba(255,255,255,.75);font-weight:800}
-    a{color:#7bd3ff}
-    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-    .pill{display:inline-block;padding:3px 8px;border-radius:999px;font-size:12px;font-weight:800}
-    .pending{background:rgba(255,255,255,.08)}
-    .approved{background:rgba(0,255,170,.12);border:1px solid rgba(0,255,170,.25)}
-    .rejected{background:rgba(255,0,80,.12);border:1px solid rgba(255,0,80,.25)}
-    .muted{opacity:.75}
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="card">
-      <h2 style="margin:0 0 10px;">Cali Votes — Admin</h2>
-      <div class="row">
-        <input id="pw" type="password" placeholder="Admin password" style="min-width:240px" />
-        <select id="filter">
-          <option value="pending_with_proof" selected>Pending + proof uploaded</option>
-          <option value="pending_all">All pending</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-        </select>
-        <button id="refresh">Refresh</button>
-        <span class="muted" id="count"></span>
-      </div>
-      <div id="err" class="muted" style="margin-top:10px;"></div>
+/**
+ * Cali Votes — Multi-Step Voting Backend (FINAL CLEAN VERSION)
+ *
+ * Supports:
+ * - Email verification via Resend
+ * - Session tokens
+ * - Multi-step flow (register → verify → vote → pay → upload)
+ * - Origin allowlist (local + production)
+ * - Admin review + leaderboard
+ */
 
-      <table>
-        <thead>
-          <tr>
-            <th>Created</th><th>Email</th><th>City</th><th>Votes</th><th>Status</th><th>Proof</th><th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="tbody"></tbody>
-      </table>
-    </div>
-  </div>
+/* =========================
+   CONFIG
+========================= */
 
-<script>
-  let EXEC_URL = "";
-  const pw = document.getElementById("pw");
-  const filter = document.getElementById("filter");
-  const refreshBtn = document.getElementById("refresh");
-  const tbody = document.getElementById("tbody");
-  const count = document.getElementById("count");
-  const err = document.getElementById("err");
+const CFG = {
+  SHEET_ID: '15fYGXqlmN7300gu91ho7QYizNxIHr_mFPEQIXWigqjk',
+  SHEET_NAME: 'Votes',
 
-  function esc(s){return String(s||"").replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));}
-  function pill(status){
-    const cls = status==="approved"?"approved":status==="rejected"?"rejected":"pending";
-    return `<span class="pill ${cls}">${esc(status)}</span>`;
+  DRIVE_FOLDER_ID: '1yUXw6Dqay5503TFN6uhPxWyUozXQuaLx',
+
+  RESEND_API_KEY: 're_72iRHvPa_EpHZUyoj77RaqUNDqq39cgHh',
+  SENDER_EMAIL: 'voting@ifuckfans.com',
+
+  ADMIN_PASSWORD: 'BeTheBitch2014',
+
+  FRONTEND_BASE_URL: 'https://mrowtown.github.io/Cali_Votes',
+  UPLOAD_PAGE_PATH: '/upload.html',
+
+  EMAIL_CODE_EXPIRY_MINUTES: 15,
+  SESSION_EXPIRY_DAYS: 7,
+  RATE_LIMIT_PER_HOUR: 5
+};
+
+/* =========================
+   SECURITY
+========================= */
+
+const SECURITY = {
+  ALLOWED_ORIGINS: [
+    'https://mrowtown.github.io',
+    'http://localhost:5500',
+    'http://127.0.0.1:5500'
+  ],
+  ALLOWED_REFERER_PREFIXES: [
+    'https://mrowtown.github.io/Cali_Votes',
+    'http://localhost:5500',
+    'http://127.0.0.1:5500',
+    'https://script.google.com'
+  ]
+};
+
+function getHeader_(e, name) {
+  const h = e && e.headers ? e.headers : {};
+  const key = Object.keys(h).find(k => k.toLowerCase() === name.toLowerCase());
+  return key ? String(h[key]) : '';
+}
+
+function isAllowedRequest_(e) {
+  const origin = getHeader_(e, 'Origin');
+  const referer = getHeader_(e, 'Referer');
+
+  if (origin) {
+    return SECURITY.ALLOWED_ORIGINS.includes(origin);
   }
 
-  async function api(action, payload){
-    const res = await fetch(EXEC_URL, {
-      method:"POST",
-      headers:{ "Content-Type":"text/plain;charset=utf-8" },
-      body: JSON.stringify({ action, ...payload })
-    });
-    const t = await res.text();
-    try { return JSON.parse(t); } catch { return { error:t }; }
+  if (referer) {
+    return SECURITY.ALLOWED_REFERER_PREFIXES.some(p => referer.startsWith(p));
   }
 
-  async function load(){
-    err.textContent = "";
-    tbody.innerHTML = `<tr><td colspan="7" class="muted">Loading…</td></tr>`;
-    const res = await api("adminList", { password: pw.value, filter: filter.value });
-    if (res.error){
-      tbody.innerHTML = `<tr><td colspan="7" class="muted">—</td></tr>`;
-      err.textContent = res.error;
-      return;
-    }
-    const rows = res.rows || [];
-    count.textContent = rows.length ? `${rows.length} row(s)` : "";
-    tbody.innerHTML = rows.length ? rows.map(r=>{
-      const proof = r.screenshot_drive_url ? `<a href="${esc(r.screenshot_drive_url)}" target="_blank" rel="noopener">open</a>` : `<span class="muted">none</span>`;
-      return `<tr data-id="${esc(r.submission_id)}">
-        <td>${esc(r.created_at)}</td>
-        <td>${esc(r.email)}</td>
-        <td>${esc(r.city)}</td>
-        <td><b>${esc(r.votes_claimed)}</b></td>
-        <td>${pill(r.status)}</td>
-        <td>${proof}</td>
-        <td>
-          <div class="row" style="gap:8px;">
-            <button class="approve">Approve</button>
-            <button class="danger reject">Reject</button>
-            <button class="secondary copyid">Copy ID</button>
-          </div>
-        </td>
-      </tr>`;
-    }).join("") : `<tr><td colspan="7" class="muted">No rows.</td></tr>`;
+  return false;
+}
+
+/* =========================
+   HELPERS
+========================= */
+
+function json_(o) {
+  return ContentService.createTextOutput(JSON.stringify(o))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function now_() { return new Date(); }
+function uuid_() { return Utilities.getUuid(); }
+
+function addMinutes_(d, m) {
+  const x = new Date(d); x.setMinutes(x.getMinutes() + m); return x;
+}
+function addDays_(d, days) {
+  const x = new Date(d); x.setDate(x.getDate() + days); return x;
+}
+
+function email_(e) {
+  return String(e || '').toLowerCase().trim();
+}
+
+function sheet_() {
+  const ss = SpreadsheetApp.openById(CFG.SHEET_ID);
+  const sh = ss.getSheetByName(CFG.SHEET_NAME);
+  if (!sh) throw new Error('Votes sheet not found');
+  return sh;
+}
+
+/* =========================
+   RATE LIMIT
+========================= */
+
+function limited_(ip, email) {
+  const cache = CacheService.getScriptCache();
+  const key = `rl:${ip}:${email}`;
+  const n = Number(cache.get(key) || 0);
+  if (n >= CFG.RATE_LIMIT_PER_HOUR) return true;
+  cache.put(key, String(n + 1), 3600);
+  return false;
+}
+
+/* =========================
+   ROUTING
+========================= */
+
+function doGet(e) {
+  const page = String(e?.parameter?.page || '').toLowerCase();
+
+  if (page === 'admin') {
+    return HtmlService.createHtmlOutputFromFile('admin');
   }
 
-  tbody.addEventListener("click", async (e)=>{
-    const tr = e.target.closest("tr[data-id]");
-    if (!tr) return;
-    const submissionId = tr.getAttribute("data-id");
-    if (e.target.classList.contains("copyid")){
-      await navigator.clipboard.writeText(submissionId);
-      return;
+  if (page === 'leaderboard') {
+    return leaderboard_();
+  }
+
+  if (page === 'selftest') {
+    return json_({ ok: true });
+  }
+
+  return ContentService.createTextOutput('OK');
+}
+
+function doPost(e) {
+  try {
+    if (!isAllowedRequest_(e)) {
+      return json_({ error: 'Forbidden (origin)' });
     }
-    if (e.target.classList.contains("approve")){
-      const res = await api("approve",{ password: pw.value, submissionId });
-      if (res.error) return err.textContent=res.error;
-      return load();
+
+    const data = JSON.parse(e.postData?.contents || '{}');
+
+    switch (data.action) {
+      case 'requestEmailCode': return requestEmailCode_(data);
+      case 'verifyEmailCode': return verifyEmailCode_(data);
+      case 'submitVote': return submitVote_(data);
+      case 'uploadScreenshot': return upload_(data);
+      case 'adminList': return adminList_(data);
+      case 'approve': return approve_(data);
+      case 'reject': return reject_(data);
+      default: return json_({ error: 'Invalid action' });
     }
-    if (e.target.classList.contains("reject")){
-      const reason = prompt("Reason (optional):") || "";
-      const res = await api("reject",{ password: pw.value, submissionId, reason });
-      if (res.error) return err.textContent=res.error;
-      return load();
+  } catch (err) {
+    return json_({ error: err.message });
+  }
+}
+
+/* =========================
+   EMAIL VERIFICATION
+========================= */
+
+function requestEmailCode_(d) {
+  const email = email_(d.email);
+  if (!email) return json_({ error: 'Email required' });
+
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expires = addMinutes_(now_(), CFG.EMAIL_CODE_EXPIRY_MINUTES);
+
+  CacheService.getScriptCache().put(
+    `email_code:${email}`,
+    JSON.stringify({ code, expires }),
+    CFG.EMAIL_CODE_EXPIRY_MINUTES * 60
+  );
+
+  sendEmail_(email, `Your Cali Votes code: ${code}`,
+    `<p>Your verification code:</p><h2>${code}</h2><p>Expires in ${CFG.EMAIL_CODE_EXPIRY_MINUTES} minutes.</p>`
+  );
+
+  return json_({ ok: true });
+}
+
+function verifyEmailCode_(d) {
+  const email = email_(d.email);
+  const code = String(d.code || '').trim();
+
+  const raw = CacheService.getScriptCache().get(`email_code:${email}`);
+  if (!raw) return json_({ error: 'Code expired' });
+
+  const obj = JSON.parse(raw);
+  if (obj.code !== code) return json_({ error: 'Invalid code' });
+
+  const session = uuid_();
+  const expires = addDays_(now_(), CFG.SESSION_EXPIRY_DAYS);
+
+  CacheService.getScriptCache().put(
+    `session:${session}`,
+    JSON.stringify({ email, expires }),
+    CFG.SESSION_EXPIRY_DAYS * 86400
+  );
+
+  return json_({ ok: true, session });
+}
+
+function getSession_(token) {
+  const raw = CacheService.getScriptCache().get(`session:${token}`);
+  if (!raw) return null;
+  const s = JSON.parse(raw);
+  if (new Date(s.expires).getTime() < Date.now()) return null;
+  return s;
+}
+
+/* =========================
+   SUBMIT VOTE
+========================= */
+
+function submitVote_(d) {
+  const session = getSession_(d.session);
+  if (!session) return json_({ error: 'Session expired' });
+
+  const city = String(d.city || '').trim();
+  const votes = Number(d.votes_claimed);
+  const payment = String(d.payment_method_selected || '');
+
+  if (!city || !votes || votes <= 0) return json_({ error: 'Invalid input' });
+
+  const submissionId = uuid_();
+  const uploadToken = uuid_().replace(/-/g, '');
+  const uploadExpires = addDays_(now_(), CFG.SESSION_EXPIRY_DAYS);
+
+  sheet_().appendRow([
+    submissionId, now_(),
+    d.name_optional || '', d.discord_handle_optional || '',
+    session.email, city, votes, '',
+    'pending', payment,
+    '', '', '', 'unknown',
+    uploadToken, uploadExpires
+  ]);
+
+  return json_({
+    ok: true,
+    submissionId,
+    upload_url: CFG.FRONTEND_BASE_URL + CFG.UPLOAD_PAGE_PATH + '?token=' + uploadToken
+  });
+}
+
+/* =========================
+   UPLOAD SCREENSHOT
+========================= */
+
+function upload_(d) {
+  const token = String(d.token || '');
+  const img = String(d.screenshot || '');
+  if (!token || !img.includes('base64,')) return json_({ error: 'Invalid upload' });
+
+  const sh = sheet_();
+  const rows = sh.getDataRange().getValues();
+
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][14] === token) {
+      const bytes = Utilities.base64Decode(img.split('base64,')[1]);
+      const blob = Utilities.newBlob(bytes, 'image/jpeg', rows[i][0] + '.jpg');
+      const file = DriveApp.getFolderById(CFG.DRIVE_FOLDER_ID).createFile(blob);
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      sh.getRange(i + 1, 11).setValue(file.getUrl());
+      return json_({ ok: true });
+    }
+  }
+  return json_({ error: 'Token not found' });
+}
+
+/* =========================
+   ADMIN
+========================= */
+
+function adminList_(d) {
+  if (d.password !== CFG.ADMIN_PASSWORD) return json_({ error: 'Unauthorized' });
+
+  const rows = sheet_().getDataRange().getValues().slice(1);
+  return json_({
+    ok: true,
+    rows: rows.map(r => ({
+      submission_id: r[0],
+      email: r[4],
+      city: r[5],
+      votes: r[6],
+      status: r[8],
+      proof: r[10]
+    }))
+  });
+}
+
+function approve_(d) {
+  return setStatus_(d, 'approved');
+}
+function reject_(d) {
+  return setStatus_(d, 'rejected', d.reason || '');
+}
+
+function setStatus_(d, status, note) {
+  if (d.password !== CFG.ADMIN_PASSWORD) return json_({ error: 'Unauthorized' });
+  const sh = sheet_();
+  const rows = sh.getDataRange().getValues();
+
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === d.submissionId) {
+      sh.getRange(i + 1, 9).setValue(status);
+      if (note) sh.getRange(i + 1, 13).setValue(note);
+      return json_({ ok: true });
+    }
+  }
+  return json_({ error: 'Not found' });
+}
+
+/* =========================
+   LEADERBOARD
+========================= */
+
+function leaderboard_() {
+  const rows = sheet_().getDataRange().getValues().slice(1);
+  const totals = {};
+  rows.forEach(r => {
+    if (r[8] === 'approved') {
+      totals[r[5]] = (totals[r[5]] || 0) + Number(r[6] || 0);
     }
   });
+  return json_({ leaderboard: totals });
+}
 
-  refreshBtn.addEventListener("click", load);
-  filter.addEventListener("change", load);
+/* =========================
+   EMAIL
+========================= */
 
-  pw.value = localStorage.getItem("cali_admin_pw") || "";
-  pw.addEventListener("input", ()=> localStorage.setItem("cali_admin_pw", pw.value));
-
-  google.script.url.getLocation(function(loc) {
-    EXEC_URL = (loc && loc.href ? loc.href : "").split("?")[0];
-    load();
+function sendEmail_(to, subject, html) {
+  UrlFetchApp.fetch('https://api.resend.com/emails', {
+    method: 'post',
+    headers: { Authorization: 'Bearer ' + CFG.RESEND_API_KEY },
+    contentType: 'application/json',
+    payload: JSON.stringify({
+      from: CFG.SENDER_EMAIL,
+      to: [to],
+      subject,
+      html
+    })
   });
-</script>
-</body>
-</html>
+}
