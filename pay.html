@@ -22,7 +22,7 @@
       </div>
 
       <div style="margin-top:14px;">
-        <img id="pay_qr" style="max-width:320px;border-radius:14px;border:1px solid rgba(255,255,255,.14);display:none;" />
+        <img id="pay_qr" class="qr" style="display:none;" alt="Payment QR" />
       </div>
 
       <p id="msg" class="msg" style="margin-top:12px;"></p>
@@ -40,6 +40,107 @@
 
   <script src="config.js"></script>
   <script src="app.js"></script>
+  <script>
+    const msg = document.getElementById("msg");
+    const btn = document.getElementById("createSubmission");
+
+    function show(type, text){
+      msg.className = "msg " + (type || "");
+      msg.textContent = text;
+    }
+
+    function loadVoteDraft(){
+      const raw = localStorage.getItem("cali_vote_payload");
+      if (!raw) return null;
+      try { return JSON.parse(raw); } catch (_) { return null; }
+    }
+
+    (function boot(){
+      const s = getSession();
+      if (!s.session_token || !s.email) {
+        window.location.href = "landing.html";
+        return;
+      }
+
+      const draft = loadVoteDraft();
+      if (!draft) {
+        show("err", "Missing vote details. Please go back and choose your votes.");
+        btn.disabled = true;
+        return;
+      }
+
+      const city = draft.city || "";
+      const votes = Number(draft.votes_claimed || 0);
+      const payment = draft.payment_method_selected || "";
+
+      if (!city || !votes || !payment) {
+        show("err", "Missing vote details. Please go back and choose your votes.");
+        btn.disabled = true;
+        return;
+      }
+
+      document.getElementById("pay_city").textContent = city;
+      document.getElementById("pay_votes").textContent = String(votes);
+      document.getElementById("pay_amount").textContent = "$" + String(Math.round(votes * 5));
+      document.getElementById("pay_method").textContent = payment;
+
+      const qrMap = {
+        CashApp: "cashapp-qr.png",
+        Venmo: "venmo-qr.png",
+        SOL: "sol-qr.png",
+        ETH: "eth-qr.png",
+        BTC: "btc-qr.png"
+      };
+
+      const file = qrMap[payment];
+      if (file) {
+        const base = cfg().ASSET_BASE.replace(/\/+$/, "");
+        const img = document.getElementById("pay_qr");
+        img.src = base + "/" + file;
+        img.style.display = "block";
+      } else {
+        show("err", "Unknown payment method selected.");
+      }
+    })();
+
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      msg.textContent = "";
+
+      const s = getSession();
+      const draft = loadVoteDraft();
+      if (!draft || !s.session_token) {
+        show("err", "Missing session or vote details.");
+        btn.disabled = false;
+        return;
+      }
+
+      const res = await post("submitVote", {
+        session: s.session_token,
+        city: draft.city,
+        votes_claimed: draft.votes_claimed,
+        payment_method_selected: draft.payment_method_selected,
+        name_optional: draft.name_optional || "",
+        discord_handle_optional: draft.discord_handle_optional || ""
+      });
+
+      if (res.error) {
+        show("err", "Error: " + res.error);
+        btn.disabled = false;
+        return;
+      }
+
+      if (res.upload_url) {
+        localStorage.setItem("cali_last_upload_url", res.upload_url);
+        if (res.submissionId) localStorage.setItem("cali_last_submission_id", res.submissionId);
+        window.location.href = res.upload_url;
+        return;
+      }
+
+      show("err", "Upload link missing. Please try again.");
+      btn.disabled = false;
+    });
+  </script>
   <script>mountSessionBanner();</script>
 </body>
 </html>

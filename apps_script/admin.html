@@ -1,349 +1,188 @@
-/**
- * Cali Votes — Multi-Step Voting Backend (FINAL CLEAN VERSION)
- *
- * Supports:
- * - Email verification via Resend
- * - Session tokens
- * - Multi-step flow (register → verify → vote → pay → upload)
- * - Origin allowlist (local + production)
- * - Admin review + leaderboard
- */
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cali Votes — Admin</title>
+  <style>
+    :root {
+      --bg: #0b0b0f;
+      --card: #141420;
+      --muted: rgba(255,255,255,.72);
+      --border: rgba(255,255,255,.12);
+      --accent: #ff2da6;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background: var(--bg); color: #fff; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 18px; }
+    h1 { margin: 0 0 10px; font-size: 22px; }
+    label { font-weight: 700; font-size: 12px; color: rgba(255,255,255,.8); display: block; margin-bottom: 6px; }
+    input, select, button { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: #0f0f18; color: #fff; }
+    button { cursor: pointer; border: none; background: var(--accent); color: #000; font-weight: 900; }
+    button.secondary { background: #222236; color: #fff; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+    th, td { text-align: left; padding: 10px; border-bottom: 1px solid rgba(255,255,255,.08); font-size: 13px; }
+    th { color: rgba(255,255,255,.7); font-weight: 700; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .row > * { flex: 1; }
+    .muted { color: var(--muted); }
+    .msg { margin-top: 12px; padding: 10px 12px; border-radius: 12px; display: none; }
+    .ok { background: rgba(0,255,170,.12); border: 1px solid rgba(0,255,170,.25); }
+    .err { background: rgba(255,0,80,.12); border: 1px solid rgba(255,0,80,.25); }
+    .actions { display: flex; gap: 8px; }
+    .pill { padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.08); font-size: 12px; }
+    a { color: #7bd3ff; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Admin — Cali Votes</h1>
+      <p class="muted">Exec URL: <span id="execUrl" class="pill">loading…</span></p>
 
-/* =========================
-   CONFIG
-========================= */
+      <div id="msg" class="msg"></div>
 
-const CFG = {
-  SHEET_ID: '15fYGXqlmN7300gu91ho7QYizNxIHr_mFPEQIXWigqjk',
-  SHEET_NAME: 'Votes',
+      <div class="row" style="margin-top:12px;">
+        <div>
+          <label>Password</label>
+          <input id="password" type="password" placeholder="Admin password" />
+        </div>
+        <div>
+          <label>Filter</label>
+          <select id="filter">
+            <option value="pending_with_proof">Pending with proof</option>
+            <option value="pending_all">Pending (all)</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="all">All</option>
+          </select>
+        </div>
+        <div style="display:flex; align-items:flex-end;">
+          <button id="refresh" type="button">Refresh</button>
+        </div>
+      </div>
 
-  DRIVE_FOLDER_ID: '1yUXw6Dqay5503TFN6uhPxWyUozXQuaLx',
+      <div style="margin-top:12px; overflow:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Created</th>
+              <th>Email</th>
+              <th>City</th>
+              <th>Votes</th>
+              <th>Status</th>
+              <th>Payment</th>
+              <th>Proof</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="rows">
+            <tr><td colspan="8" class="muted">No data yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
-  RESEND_API_KEY: 're_72iRHvPa_EpHZUyoj77RaqUNDqq39cgHh',
-  SENDER_EMAIL: 'voting@ifuckfans.com',
+  <script>
+    const EXEC_URL = "<?= ScriptApp.getService().getUrl() ?>";
+    const msg = document.getElementById("msg");
+    const rowsEl = document.getElementById("rows");
 
-  ADMIN_PASSWORD: 'BeTheBitch2014',
+    document.getElementById("execUrl").textContent = EXEC_URL || "unknown";
 
-  FRONTEND_BASE_URL: 'https://mrowtown.github.io/Cali_Votes',
-  UPLOAD_PAGE_PATH: '/upload.html',
-
-  EMAIL_CODE_EXPIRY_MINUTES: 15,
-  SESSION_EXPIRY_DAYS: 7,
-  RATE_LIMIT_PER_HOUR: 5
-};
-
-/* =========================
-   SECURITY
-========================= */
-
-const SECURITY = {
-  ALLOWED_ORIGINS: [
-    'https://mrowtown.github.io',
-    'http://localhost:5500',
-    'http://127.0.0.1:5500'
-  ],
-  ALLOWED_REFERER_PREFIXES: [
-    'https://mrowtown.github.io/Cali_Votes',
-    'http://localhost:5500',
-    'http://127.0.0.1:5500',
-    'https://script.google.com'
-  ]
-};
-
-function getHeader_(e, name) {
-  const h = e && e.headers ? e.headers : {};
-  const key = Object.keys(h).find(k => k.toLowerCase() === name.toLowerCase());
-  return key ? String(h[key]) : '';
-}
-
-function isAllowedRequest_(e) {
-  const origin = getHeader_(e, 'Origin');
-  const referer = getHeader_(e, 'Referer');
-
-  if (origin) {
-    return SECURITY.ALLOWED_ORIGINS.includes(origin);
-  }
-
-  if (referer) {
-    return SECURITY.ALLOWED_REFERER_PREFIXES.some(p => referer.startsWith(p));
-  }
-
-  return false;
-}
-
-/* =========================
-   HELPERS
-========================= */
-
-function json_(o) {
-  return ContentService.createTextOutput(JSON.stringify(o))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function now_() { return new Date(); }
-function uuid_() { return Utilities.getUuid(); }
-
-function addMinutes_(d, m) {
-  const x = new Date(d); x.setMinutes(x.getMinutes() + m); return x;
-}
-function addDays_(d, days) {
-  const x = new Date(d); x.setDate(x.getDate() + days); return x;
-}
-
-function email_(e) {
-  return String(e || '').toLowerCase().trim();
-}
-
-function sheet_() {
-  const ss = SpreadsheetApp.openById(CFG.SHEET_ID);
-  const sh = ss.getSheetByName(CFG.SHEET_NAME);
-  if (!sh) throw new Error('Votes sheet not found');
-  return sh;
-}
-
-/* =========================
-   RATE LIMIT
-========================= */
-
-function limited_(ip, email) {
-  const cache = CacheService.getScriptCache();
-  const key = `rl:${ip}:${email}`;
-  const n = Number(cache.get(key) || 0);
-  if (n >= CFG.RATE_LIMIT_PER_HOUR) return true;
-  cache.put(key, String(n + 1), 3600);
-  return false;
-}
-
-/* =========================
-   ROUTING
-========================= */
-
-function doGet(e) {
-  const page = String(e?.parameter?.page || '').toLowerCase();
-
-  if (page === 'admin') {
-    return HtmlService.createHtmlOutputFromFile('admin');
-  }
-
-  if (page === 'leaderboard') {
-    return leaderboard_();
-  }
-
-  if (page === 'selftest') {
-    return json_({ ok: true });
-  }
-
-  return ContentService.createTextOutput('OK');
-}
-
-function doPost(e) {
-  try {
-    if (!isAllowedRequest_(e)) {
-      return json_({ error: 'Forbidden (origin)' });
+    function show(type, text) {
+      msg.className = "msg " + (type || "");
+      msg.textContent = text;
+      msg.style.display = "block";
     }
 
-    const data = JSON.parse(e.postData?.contents || '{}');
-
-    switch (data.action) {
-      case 'requestEmailCode': return requestEmailCode_(data);
-      case 'verifyEmailCode': return verifyEmailCode_(data);
-      case 'submitVote': return submitVote_(data);
-      case 'uploadScreenshot': return upload_(data);
-      case 'adminList': return adminList_(data);
-      case 'approve': return approve_(data);
-      case 'reject': return reject_(data);
-      default: return json_({ error: 'Invalid action' });
+    async function post(payload) {
+      const res = await fetch(EXEC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+      });
+      const text = await res.text();
+      try { return JSON.parse(text); } catch { return { error: text }; }
     }
-  } catch (err) {
-    return json_({ error: err.message });
-  }
-}
 
-/* =========================
-   EMAIL VERIFICATION
-========================= */
+    function renderRows(rows) {
+      if (!rows.length) {
+        rowsEl.innerHTML = "<tr><td colspan=\"8\" class=\"muted\">No matching rows.</td></tr>";
+        return;
+      }
 
-function requestEmailCode_(d) {
-  const email = email_(d.email);
-  if (!email) return json_({ error: 'Email required' });
-
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  const expires = addMinutes_(now_(), CFG.EMAIL_CODE_EXPIRY_MINUTES);
-
-  CacheService.getScriptCache().put(
-    `email_code:${email}`,
-    JSON.stringify({ code, expires }),
-    CFG.EMAIL_CODE_EXPIRY_MINUTES * 60
-  );
-
-  sendEmail_(email, `Your Cali Votes code: ${code}`,
-    `<p>Your verification code:</p><h2>${code}</h2><p>Expires in ${CFG.EMAIL_CODE_EXPIRY_MINUTES} minutes.</p>`
-  );
-
-  return json_({ ok: true });
-}
-
-function verifyEmailCode_(d) {
-  const email = email_(d.email);
-  const code = String(d.code || '').trim();
-
-  const raw = CacheService.getScriptCache().get(`email_code:${email}`);
-  if (!raw) return json_({ error: 'Code expired' });
-
-  const obj = JSON.parse(raw);
-  if (obj.code !== code) return json_({ error: 'Invalid code' });
-
-  const session = uuid_();
-  const expires = addDays_(now_(), CFG.SESSION_EXPIRY_DAYS);
-
-  CacheService.getScriptCache().put(
-    `session:${session}`,
-    JSON.stringify({ email, expires }),
-    CFG.SESSION_EXPIRY_DAYS * 86400
-  );
-
-  return json_({ ok: true, session });
-}
-
-function getSession_(token) {
-  const raw = CacheService.getScriptCache().get(`session:${token}`);
-  if (!raw) return null;
-  const s = JSON.parse(raw);
-  if (new Date(s.expires).getTime() < Date.now()) return null;
-  return s;
-}
-
-/* =========================
-   SUBMIT VOTE
-========================= */
-
-function submitVote_(d) {
-  const session = getSession_(d.session);
-  if (!session) return json_({ error: 'Session expired' });
-
-  const city = String(d.city || '').trim();
-  const votes = Number(d.votes_claimed);
-  const payment = String(d.payment_method_selected || '');
-
-  if (!city || !votes || votes <= 0) return json_({ error: 'Invalid input' });
-
-  const submissionId = uuid_();
-  const uploadToken = uuid_().replace(/-/g, '');
-  const uploadExpires = addDays_(now_(), CFG.SESSION_EXPIRY_DAYS);
-
-  sheet_().appendRow([
-    submissionId, now_(),
-    d.name_optional || '', d.discord_handle_optional || '',
-    session.email, city, votes, '',
-    'pending', payment,
-    '', '', '', 'unknown',
-    uploadToken, uploadExpires
-  ]);
-
-  return json_({
-    ok: true,
-    submissionId,
-    upload_url: CFG.FRONTEND_BASE_URL + CFG.UPLOAD_PAGE_PATH + '?token=' + uploadToken
-  });
-}
-
-/* =========================
-   UPLOAD SCREENSHOT
-========================= */
-
-function upload_(d) {
-  const token = String(d.token || '');
-  const img = String(d.screenshot || '');
-  if (!token || !img.includes('base64,')) return json_({ error: 'Invalid upload' });
-
-  const sh = sheet_();
-  const rows = sh.getDataRange().getValues();
-
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i][14] === token) {
-      const bytes = Utilities.base64Decode(img.split('base64,')[1]);
-      const blob = Utilities.newBlob(bytes, 'image/jpeg', rows[i][0] + '.jpg');
-      const file = DriveApp.getFolderById(CFG.DRIVE_FOLDER_ID).createFile(blob);
-      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-      sh.getRange(i + 1, 11).setValue(file.getUrl());
-      return json_({ ok: true });
+      rowsEl.innerHTML = rows.map(r => {
+        const proof = r.screenshot_drive_url
+          ? `<a href="${r.screenshot_drive_url}" target="_blank" rel="noopener">view</a>`
+          : "—";
+        return `
+          <tr>
+            <td>${r.created_at || ""}</td>
+            <td>${r.email || ""}</td>
+            <td>${r.city || ""}</td>
+            <td>${r.votes_claimed || 0}</td>
+            <td>${r.status || ""}</td>
+            <td>${r.payment_method_selected || ""}</td>
+            <td>${proof}</td>
+            <td>
+              <div class="actions">
+                <button class="secondary" data-action="approve" data-id="${r.submission_id}">Approve</button>
+                <button class="secondary" data-action="reject" data-id="${r.submission_id}">Reject</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
     }
-  }
-  return json_({ error: 'Token not found' });
-}
 
-/* =========================
-   ADMIN
-========================= */
+    async function loadList() {
+      const password = document.getElementById("password").value;
+      const filter = document.getElementById("filter").value;
+      if (!password) {
+        show("err", "Password required.");
+        return;
+      }
 
-function adminList_(d) {
-  if (d.password !== CFG.ADMIN_PASSWORD) return json_({ error: 'Unauthorized' });
-
-  const rows = sheet_().getDataRange().getValues().slice(1);
-  return json_({
-    ok: true,
-    rows: rows.map(r => ({
-      submission_id: r[0],
-      email: r[4],
-      city: r[5],
-      votes: r[6],
-      status: r[8],
-      proof: r[10]
-    }))
-  });
-}
-
-function approve_(d) {
-  return setStatus_(d, 'approved');
-}
-function reject_(d) {
-  return setStatus_(d, 'rejected', d.reason || '');
-}
-
-function setStatus_(d, status, note) {
-  if (d.password !== CFG.ADMIN_PASSWORD) return json_({ error: 'Unauthorized' });
-  const sh = sheet_();
-  const rows = sh.getDataRange().getValues();
-
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i][0] === d.submissionId) {
-      sh.getRange(i + 1, 9).setValue(status);
-      if (note) sh.getRange(i + 1, 13).setValue(note);
-      return json_({ ok: true });
+      const res = await post({ action: "adminList", password, filter });
+      if (res.error) {
+        show("err", res.error);
+        return;
+      }
+      msg.style.display = "none";
+      renderRows(res.rows || []);
     }
-  }
-  return json_({ error: 'Not found' });
-}
 
-/* =========================
-   LEADERBOARD
-========================= */
+    async function updateStatus(action, submissionId) {
+      const password = document.getElementById("password").value;
+      if (!password) {
+        show("err", "Password required.");
+        return;
+      }
 
-function leaderboard_() {
-  const rows = sheet_().getDataRange().getValues().slice(1);
-  const totals = {};
-  rows.forEach(r => {
-    if (r[8] === 'approved') {
-      totals[r[5]] = (totals[r[5]] || 0) + Number(r[6] || 0);
+      let reason = "";
+      if (action === "reject") {
+        reason = prompt("Reject reason (optional):", "") || "";
+      }
+
+      const res = await post({ action, password, submissionId, reason });
+      if (res.error) {
+        show("err", res.error);
+        return;
+      }
+      show("ok", "Updated.");
+      await loadList();
     }
-  });
-  return json_({ leaderboard: totals });
-}
 
-/* =========================
-   EMAIL
-========================= */
+    document.getElementById("refresh").addEventListener("click", loadList);
 
-function sendEmail_(to, subject, html) {
-  UrlFetchApp.fetch('https://api.resend.com/emails', {
-    method: 'post',
-    headers: { Authorization: 'Bearer ' + CFG.RESEND_API_KEY },
-    contentType: 'application/json',
-    payload: JSON.stringify({
-      from: CFG.SENDER_EMAIL,
-      to: [to],
-      subject,
-      html
-    })
-  });
-}
+    rowsEl.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-action]");
+      if (!btn) return;
+      updateStatus(btn.dataset.action, btn.dataset.id);
+    });
+  </script>
+</body>
+</html>

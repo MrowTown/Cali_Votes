@@ -19,10 +19,14 @@ function esc(s){
 
 async function post(action, payload){
   const { EXEC_URL } = cfg();
+  const body = { action, ...payload };
+  if (!Object.prototype.hasOwnProperty.call(body, "origin")) {
+    body.origin = window.location.origin;
+  }
   const res = await fetch(EXEC_URL, {
     method: "POST",
     headers: { "Content-Type":"text/plain;charset=utf-8" },
-    body: JSON.stringify({ action, ...payload })
+    body: JSON.stringify(body)
   });
   const text = await res.text();
   try { return JSON.parse(text); } catch { return { error: text }; }
@@ -33,7 +37,8 @@ async function post(action, payload){
 // { session_token, email, name_optional, discord_handle_optional, expires_at }
 function saveSession(sessionObj){
   if (!sessionObj) return;
-  if (sessionObj.session_token) localStorage.setItem("cali_session_token", sessionObj.session_token);
+  const token = sessionObj.session_token || sessionObj.session || "";
+  if (token) localStorage.setItem("cali_session_token", token);
   if (sessionObj.email) localStorage.setItem("cali_email", sessionObj.email);
   if (sessionObj.name_optional) localStorage.setItem("cali_name_optional", sessionObj.name_optional);
   if (sessionObj.discord_handle_optional) localStorage.setItem("cali_discord_handle_optional", sessionObj.discord_handle_optional);
@@ -41,8 +46,10 @@ function saveSession(sessionObj){
 }
 
 function getSession(){
+  const session_token = localStorage.getItem("cali_session_token") || "";
   return {
-    session_token: localStorage.getItem("cali_session_token") || "",
+    session_token,
+    session: session_token,
     email: localStorage.getItem("cali_email") || "",
     name_optional: localStorage.getItem("cali_name_optional") || "",
     discord_handle_optional: localStorage.getItem("cali_discord_handle_optional") || "",

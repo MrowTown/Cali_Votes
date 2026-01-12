@@ -26,8 +26,8 @@
     <div class="topbar">
       <div class="pill">Verified as: <span id="who">—</span></div>
       <div style="display:flex; gap:10px; align-items:center;">
-        <button id="btnBack" class="btn btn-secondary">Back</button>
-        <button id="btnSwitch" class="btn btn-danger">Switch email</button>
+        <button id="btnBack" class="btn btn-secondary" type="button">Back</button>
+        <button id="btnSwitch" class="btn btn-danger" type="button">Switch email</button>
       </div>
     </div>
 
@@ -37,9 +37,36 @@
       <h1>Choose your votes</h1>
       <p class="muted">Pick your city, number of votes, and payment method.</p>
 
-      <!-- YOUR existing voting UI goes here.
-           If your current file already has it, paste it and I’ll merge this bar in. -->
-      <p><i>Replace this block with your current vote form UI.</i></p>
+      <form id="voteForm" class="stack">
+        <label class="label">
+          City
+          <input id="city" type="text" required placeholder="e.g., New York, NY" />
+        </label>
+
+        <label class="label">
+          Votes
+          <input id="votes_claimed" type="number" min="1" step="1" required placeholder="1" />
+        </label>
+
+        <label class="label">
+          Payment method
+          <select id="payment_method_selected" required>
+            <option value="" selected disabled>Select one…</option>
+            <option value="CashApp">CashApp</option>
+            <option value="Venmo">Venmo</option>
+            <option value="SOL">SOL</option>
+            <option value="ETH">ETH</option>
+            <option value="BTC">BTC</option>
+          </select>
+        </label>
+
+        <button class="btn" type="submit">Continue to Checkout</button>
+      </form>
+
+      <div class="row" style="gap:12px; margin-top:16px;">
+        <a class="btn secondary" href="landing.html">Back</a>
+        <a class="btn secondary" href="upload_entry.html">Already paid? Upload proof</a>
+      </div>
     </div>
   </div>
 
@@ -48,20 +75,35 @@
     const who = document.getElementById("who");
     const btnSwitch = document.getElementById("btnSwitch");
     const btnBack = document.getElementById("btnBack");
+    const form = document.getElementById("voteForm");
 
     function showErr(html){
       msgErr.innerHTML = html;
       msgErr.style.display = "block";
     }
 
+    function loadVoteDraft(){
+      const raw = localStorage.getItem("cali_vote_payload");
+      if (!raw) return null;
+      try { return JSON.parse(raw); } catch (_) { return null; }
+    }
+
     (function boot(){
       const s = getSession();
-      if (!s.session || !s.email) {
-        // If not logged in, force login
+      if (!s.session_token || !s.email) {
         window.location.href = "landing.html";
         return;
       }
       who.textContent = s.email;
+
+      const draft = loadVoteDraft();
+      if (draft) {
+        document.getElementById("city").value = draft.city || "";
+        document.getElementById("votes_claimed").value = draft.votes_claimed || "";
+        if (draft.payment_method_selected) {
+          document.getElementById("payment_method_selected").value = draft.payment_method_selected;
+        }
+      }
     })();
 
     btnBack.addEventListener("click", () => {
@@ -71,6 +113,27 @@
     btnSwitch.addEventListener("click", () => {
       clearSession();
       window.location.href = "register.html";
+    });
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      msgErr.style.display = "none";
+
+      const city = document.getElementById("city").value.trim();
+      const votes = Number(document.getElementById("votes_claimed").value || 0);
+      const payment = document.getElementById("payment_method_selected").value;
+
+      if (!city) return showErr("City is required.");
+      if (!votes || votes <= 0) return showErr("Votes must be at least 1.");
+      if (!payment) return showErr("Choose a payment method.");
+
+      const payload = {
+        city,
+        votes_claimed: votes,
+        payment_method_selected: payment
+      };
+      localStorage.setItem("cali_vote_payload", JSON.stringify(payload));
+      window.location.href = "pay.html";
     });
   </script>
   <script>mountSessionBanner();</script>

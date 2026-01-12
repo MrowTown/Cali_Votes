@@ -22,6 +22,10 @@
         </p>
       </div>
 
+      <div id="pendingUpload" class="notice" style="display:none; margin-top:12px;">
+        <p class="small" style="margin:0">We found your latest upload link. You can continue straight to upload.</p>
+      </div>
+
       <div class="row" style="margin-top:14px">
         <button id="go">Go to vote</button>
         <button class="secondary" id="home">Home</button>
@@ -29,11 +33,22 @@
     </div>
   </div>
 <script>
-  document.getElementById("go").onclick = ()=>{
-    const s = getSession();
-    location.href = s.session_token ? "vote.html" : "register.html";
-  };
-  document.getElementById("home").onclick = ()=> location.href="landing.html";
+  const goBtn = document.getElementById("go");
+  const pending = document.getElementById("pendingUpload");
+  const lastUploadUrl = localStorage.getItem("cali_last_upload_url") || "";
+
+  if (lastUploadUrl) {
+    pending.style.display = "block";
+    goBtn.textContent = "Go to upload";
+    goBtn.onclick = () => { location.href = lastUploadUrl; };
+  } else {
+    goBtn.onclick = () => {
+      const s = getSession();
+      location.href = s.session_token ? "vote.html" : "register.html";
+    };
+  }
+
+  document.getElementById("home").onclick = () => location.href = "landing.html";
 </script>
   <script>mountSessionBanner();</script>
 </body>

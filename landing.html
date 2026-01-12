@@ -81,7 +81,7 @@
 
       // ALWAYS show register button. If a session exists, show sessionBox too.
       const s = getSession();
-      if (s.session && s.email) {
+      if (s.session_token && s.email) {
         who.textContent = s.email;
         sessionBox.style.display = "block";
       }

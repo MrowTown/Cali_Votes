@@ -3,56 +3,100 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Cali Votes — Vote</title>
+  <title>Cali Votes — Register</title>
   <link rel="stylesheet" href="style.css" />
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <style>
+    .card { max-width: 820px; margin: 24px auto; padding: 18px; border-radius: 16px; background: rgba(0,0,0,.06); }
+    .btn { display:inline-block; padding:12px 16px; border-radius: 14px; border: 0; cursor:pointer; font-weight: 800; }
+    .btn-secondary { background:#111; color:#fff; border:1px solid rgba(0,0,0,.18); }
+    .msg { margin-top:12px; padding:10px 12px; border-radius:12px; display:none; }
+    .err { background: rgba(255,0,80,.12); border: 1px solid rgba(255,0,80,.25); }
+    .ok { background: rgba(0,255,170,.12); border: 1px solid rgba(0,255,170,.25); }
+  </style>
 </head>
 <body>
   <div id="sessionBanner"></div>
 
-  <main class="wrap">
-    <section class="card">
-      <h1>Choose Your City</h1>
-      <p class="muted">
-        $5 = 1 vote. Pick your city, choose vote count, then pay and upload proof.
+  <div class="card">
+    <h1>Register your email</h1>
+    <p class="muted">
+      We’ll send you a verification link. No account, no password.
+    </p>
+
+    <div id="msgOk" class="msg ok"></div>
+    <div id="msgErr" class="msg err"></div>
+
+    <form id="registerForm">
+      <label class="label">Email</label>
+      <input id="email" type="email" required placeholder="you@example.com" />
+      <button class="btn" type="submit" style="margin-top:12px;">Send verification link</button>
+    </form>
+
+    <div id="sessionBox" style="display:none; margin-top:14px;">
+      <p class="muted" style="margin:0 0 10px;">
+        You’re currently verified as <code id="who"></code>.
       </p>
-
-      <p id="msg" class="msg"></p>
-
-      <form id="voteForm" class="stack" data-requires-auth>
-        <label class="label">
-          City
-          <input id="city" type="text" required placeholder="e.g., New York, NY" />
-        </label>
-
-        <label class="label">
-          Votes
-          <input id="votes_claimed" type="number" min="1" step="1" required placeholder="1" />
-        </label>
-
-        <label class="label">
-          Payment method
-          <select id="payment_method_selected" required>
-            <option value="" selected disabled>Select one…</option>
-            <option value="CashApp">CashApp</option>
-            <option value="Venmo">Venmo</option>
-            <option value="SOL">SOL</option>
-            <option value="ETH">ETH</option>
-            <option value="BTC">BTC</option>
-          </select>
-        </label>
-
-        <button class="btn" type="submit">Continue to Checkout</button>
-      </form>
-
-      <div class="row" style="gap:12px; margin-top:16px;">
-        <a class="btn secondary" href="landing.html">Back</a>
-        <a class="btn secondary" href="upload_entry.html">Already paid? Upload proof</a>
+      <div class="row">
+        <button id="btnContinue" class="btn btn-secondary" type="button">Continue to voting</button>
+        <button id="btnSwitch" class="btn" type="button" style="background:#ff245a;color:#fff;">Use a different email</button>
       </div>
-    </section>
-  </main>
+    </div>
 
-  <script src="config.js"></script>
-  <script src="app.js"></script>
+    <div class="row" style="gap:12px; margin-top:16px;">
+      <a class="btn secondary" href="landing.html">Back</a>
+    </div>
+  </div>
+
+  <script>
+    const msgOk = document.getElementById("msgOk");
+    const msgErr = document.getElementById("msgErr");
+    const form = document.getElementById("registerForm");
+    const emailInput = document.getElementById("email");
+    const sessionBox = document.getElementById("sessionBox");
+    const who = document.getElementById("who");
+    const btnContinue = document.getElementById("btnContinue");
+    const btnSwitch = document.getElementById("btnSwitch");
+
+    function show(el, html){
+      msgOk.style.display = "none";
+      msgErr.style.display = "none";
+      el.innerHTML = html;
+      el.style.display = "block";
+    }
+
+    (function boot(){
+      const s = getSession();
+      if (s.session_token && s.email) {
+        who.textContent = s.email;
+        sessionBox.style.display = "block";
+      }
+    })();
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      msgOk.style.display = "none";
+      msgErr.style.display = "none";
+
+      const email = emailInput.value.trim();
+      if (!email) return show(msgErr, "Email is required.");
+
+      const res = await post("requestMagicLink", { email });
+      if (res.error) return show(msgErr, "<b>Error:</b> " + esc(res.error));
+
+      show(msgOk, "Check your inbox for a verification link. Once verified, you’ll be sent to voting.");
+    });
+
+    btnContinue.addEventListener("click", () => {
+      window.location.href = "vote.html";
+    });
+
+    btnSwitch.addEventListener("click", () => {
+      clearSession();
+      window.location.href = "register.html";
+    });
+  </script>
   <script>mountSessionBanner();</script>
 </body>
 </html>
