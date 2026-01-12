@@ -20,8 +20,6 @@
   </style>
 </head>
 <body>
-  <div id="sessionBanner"></div>
-
   <div class="wrap">
     <div class="topbar">
       <div class="pill">Verified as: <span id="who">—</span></div>
@@ -73,6 +71,5 @@
       window.location.href = "register.html";
     });
   </script>
-  <script>mountSessionBanner();</script>
 </body>
 </html>

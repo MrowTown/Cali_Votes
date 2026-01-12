@@ -9,8 +9,6 @@
   <script src="app.js"></script>
 </head>
 <body>
-  <div id="sessionBanner"></div>
-
   <div class="wrap">
     <div class="card">
       <h1>Leaderboard</h1>
@@ -44,6 +42,5 @@
   }
   load();
 </script>
-  <script>mountSessionBanner();</script>
 </body>
 </html>

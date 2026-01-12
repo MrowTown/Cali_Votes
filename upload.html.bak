@@ -9,8 +9,6 @@
   <script src="app.js"></script>
 </head>
 <body>
-  <div id="sessionBanner"></div>
-
   <div class="wrap">
     <div class="card">
       <h1>Upload your screenshot</h1>
@@ -54,6 +52,5 @@
     reader.readAsDataURL(f);
   };
 </script>
-  <script>mountSessionBanner();</script>
 </body>
 </html>

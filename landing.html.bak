@@ -22,8 +22,6 @@
   </style>
 </head>
 <body>
-  <div id="sessionBanner"></div>
-
   <div class="card">
     <h1>Vote for Cali’s Tour City</h1>
     <p class="muted">
@@ -106,6 +104,5 @@
       window.location.href = "register.html";
     });
   </script>
-  <script>mountSessionBanner();</script>
 </body>
 </html>

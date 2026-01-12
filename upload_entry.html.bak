@@ -9,8 +9,6 @@
   <script src="app.js"></script>
 </head>
 <body>
-  <div id="sessionBanner"></div>
-
   <div class="wrap">
     <div class="card">
       <h1>Upload proof</h1>
@@ -35,6 +33,5 @@
   };
   document.getElementById("home").onclick = ()=> location.href="landing.html";
 </script>
-  <script>mountSessionBanner();</script>
 </body>
 </html>

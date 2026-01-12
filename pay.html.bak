@@ -7,8 +7,6 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="sessionBanner"></div>
-
   <main class="wrap">
     <section class="card">
       <h1>Checkout</h1>
@@ -40,6 +38,5 @@
 
   <script src="config.js"></script>
   <script src="app.js"></script>
-  <script>mountSessionBanner();</script>
 </body>
 </html>
