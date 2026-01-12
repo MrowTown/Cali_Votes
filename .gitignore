@@ -1,3 +1,19 @@
 .DS_Store
-.DS_Store
 *.bak
+node_modules
+dist
+
+# Local secret store (never commit)
+secrets.local.json
+
+# Editor / OS noise
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Apps Script lives outside git
+apps_script/
