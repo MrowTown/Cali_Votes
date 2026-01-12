@@ -1,7 +1,7 @@
 // config.js — Cali Votes config (REQUIRED)
 
 (function () {
-  const EXEC_URL = "PASTE_EXEC_URL";
+  const EXEC_URL = "https://script.google.com/macros/s/AKfycbxoGbVDc90uokYkCl0jo8lFznSM6oTfz2a7YyKHHp9DjRBKl8zQ_jMSssW-zs83m1e_8g/exec";
   const ASSET_BASE = "https://mrowtown.github.io/Cali_Votes/assets";
 
   // --- safety checks (catch typos like phttps) ---
