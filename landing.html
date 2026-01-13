@@ -3,109 +3,82 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Cali Votes</title>
+  <title>Cali Votes — Landing</title>
   <link rel="stylesheet" href="style.css" />
   <script src="config.js"></script>
   <script src="app.js"></script>
-  <style>
-    .card { max-width: 820px; margin: 24px auto; padding: 18px; border-radius: 16px; background: rgba(0,0,0,.06); }
-    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
-    .btn { display:inline-block; padding:12px 16px; border-radius: 14px; border: 0; cursor:pointer; font-weight: 800; }
-    .btn-primary { background:#ff2da6; color:#000; }
-    .btn-secondary { background:#111; color:#fff; border:1px solid rgba(0,0,0,.18); }
-    .btn-danger { background:#ff245a; color:#fff; }
-    .muted { opacity:.75; }
-    .msg { margin-top:12px; padding:10px 12px; border-radius:12px; display:none; }
-    .err { background: rgba(255,0,80,.12); border: 1px solid rgba(255,0,80,.25); }
-    .ok { background: rgba(0,255,170,.12); border: 1px solid rgba(0,255,170,.25); }
-    code { background: rgba(0,0,0,.08); padding: 2px 6px; border-radius: 8px; }
-  </style>
 </head>
 <body>
   <div id="sessionBanner"></div>
 
-  <div class="card">
+  <div style="max-width:820px;margin:24px auto;padding:18px;border-radius:16px;background:rgba(0,0,0,.06);">
     <h1>Vote for Cali’s Tour City</h1>
-    <p class="muted">
-      Register your email to vote. You’ll get a verification link. No account, no password.
-    </p>
 
-    <div id="msgOk" class="msg ok"></div>
-    <div id="msgErr" class="msg err"></div>
+    <p id="subhead" class="muted">Register your email to vote. You’ll get a verification link.</p>
 
-    <div class="row" style="margin-top:14px;">
-      <button id="btnRegister" class="btn btn-primary">Register / Verify Email</button>
-      <button id="btnUploadOnly" class="btn btn-secondary">Already paid? Upload proof</button>
+    <div id="actions" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;">
+      <button id="btnRegister" style="padding:12px 16px;border-radius:14px;border:0;font-weight:900;background:#ff2da6;color:#000;cursor:pointer;">
+        Register / Verify Email
+      </button>
+      <button id="btnUploadOnly" style="padding:12px 16px;border-radius:14px;border:1px solid rgba(0,0,0,.18);font-weight:900;background:#111;color:#fff;cursor:pointer;">
+        Already paid? Upload proof
+      </button>
     </div>
 
-    <div id="sessionBox" style="display:none; margin-top:14px;">
-      <p class="muted" style="margin:0 0 10px;">
-        You’re currently verified as <code id="who"></code>.
-        You can continue, or switch emails.
-      </p>
-      <div class="row">
-        <button id="btnContinue" class="btn btn-secondary">Continue to voting</button>
-        <button id="btnSwitch" class="btn btn-danger">Use a different email</button>
-      </div>
-    </div>
+    <div id="msgInfo" style="display:none;margin-top:14px;padding:10px 12px;border-radius:12px;background:rgba(0,0,0,.08);"></div>
+    <div id="msgErr" style="display:none;margin-top:14px;padding:10px 12px;border-radius:12px;background:rgba(255,0,80,.12);border:1px solid rgba(255,0,80,.25);"></div>
 
-    <p class="muted" style="margin-top:14px; font-size:13px;">
-      If you clicked a verification email link, we’ll verify it and send you to voting.
+    <p class="muted" style="margin-top:14px;font-size:13px;">
+      If you clicked a verification link, we’ll verify it and send you to voting.
     </p>
   </div>
 
   <script>
-    const msgOk = document.getElementById("msgOk");
-    const msgErr = document.getElementById("msgErr");
-    const btnRegister = document.getElementById("btnRegister");
-    const btnUploadOnly = document.getElementById("btnUploadOnly");
+    mountSessionBanner();
 
-    const sessionBox = document.getElementById("sessionBox");
-    const who = document.getElementById("who");
-    const btnContinue = document.getElementById("btnContinue");
-    const btnSwitch = document.getElementById("btnSwitch");
+    const msgInfo = document.getElementById("msgInfo");
+    const msgErr  = document.getElementById("msgErr");
+    const actions = document.getElementById("actions");
+    const subhead = document.getElementById("subhead");
 
-    function show(el, html){
-      msgOk.style.display = "none";
-      msgErr.style.display = "none";
-      el.innerHTML = html;
-      el.style.display = "block";
+    function showInfo(t){
+      msgInfo.textContent = t;
+      msgInfo.style.display = "block";
+    }
+    function showErr(t){
+      msgErr.textContent = t;
+      msgErr.style.display = "block";
+    }
+    function setVerifying(on){
+      if (on) {
+        actions.style.display = "none";
+        msgErr.style.display = "none";
+        msgInfo.style.display = "block";
+        msgInfo.textContent = "Verifying your email…";
+        subhead.textContent = "Hang tight — we’re verifying your link.";
+      } else {
+        actions.style.display = "flex";
+        if (!msgInfo.textContent) msgInfo.style.display = "none";
+      }
     }
 
     (async function boot(){
-      // If coming from magic link: verify it and redirect to vote.html
-      const r = await handleMagicLinkIfPresent({ onSuccessRedirect: "vote.html" });
-      if (r.handled && !r.ok) {
-        show(msgErr, "That verification link is invalid or expired. Please register again.");
-      }
+      const token = qs("verify");
+      if (token) setVerifying(true);
 
-      // ALWAYS show register button. If a session exists, show sessionBox too.
-      const s = getSession();
-      if (s.session_token && s.email) {
-        who.textContent = s.email;
-        sessionBox.style.display = "block";
+      const r = await handleMagicLinkIfPresent({ onSuccessRedirect: "vote.html" });
+
+      if (r.handled && !r.ok) {
+        setVerifying(false);
+        showErr("That verification link is invalid or expired. Please register again.");
+      } else if (!r.handled) {
+        // Normal landing — no verify token present
+        msgInfo.style.display = "none";
       }
     })();
 
-    btnRegister.addEventListener("click", () => {
-      // IMPORTANT: don’t auto-continue; user explicitly registers/logs in
-      window.location.href = "register.html";
-    });
-
-    btnUploadOnly.addEventListener("click", () => {
-      window.location.href = "upload_entry.html";
-    });
-
-    btnContinue.addEventListener("click", () => {
-      window.location.href = "vote.html";
-    });
-
-    btnSwitch.addEventListener("click", () => {
-      clearSession();
-      // Force them into register to pick a new email
-      window.location.href = "register.html";
-    });
+    document.getElementById("btnRegister").addEventListener("click", () => window.location.href = "register.html");
+    document.getElementById("btnUploadOnly").addEventListener("click", () => window.location.href = "upload_entry.html");
   </script>
-  <script>mountSessionBanner();</script>
 </body>
 </html>
