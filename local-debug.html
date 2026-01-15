@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Cali Votes — Local Debug Launcher</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: #0b0b0f;
+      color: #fff;
+    }
+    h1 { margin: 0 0 14px; font-size: 28px; }
+    .card {
+      background: #141420;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 16px;
+      padding: 18px;
+      max-width: 980px;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      opacity: .8;
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.15);
+      background: #0f0f18;
+      color: #fff;
+      margin-bottom: 12px;
+    }
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+    button {
+      padding: 12px;
+      border-radius: 12px;
+      border: none;
+      font-weight: 900;
+      cursor: pointer;
+      background: #ff2da6;
+      color: #000;
+    }
+    button.secondary {
+      background: #23233a;
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.15);
+    }
+    .hint {
+      font-size: 12px;
+      opacity: .7;
+      margin-top: 10px;
+      line-height: 1.35;
+    }
+    code { background: rgba(255,255,255,.08); padding: 1px 6px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>Cali Votes — Local Debug Launcher</h1>
+
+    <label for="exec">Apps Script EXEC URL</label>
+    <input
+      id="exec"
+      placeholder="https://script.google.com/macros/s/AKfycbxxxx/exec"
+      autocomplete="off"
+      spellcheck="false"
+    />
+
+    <div class="buttons">
+      <button onclick="openPage('selftest')">Selftest</button>
+      <button onclick="openPage('leaderboard')">Leaderboard</button>
+      <button onclick="openPage('admin')">Admin</button>
+      <button onclick="openPage('landing')">Landing</button>
+      <button onclick="openPage('register')">Register</button>
+      <button onclick="openPage('vote')">Vote</button>
+      <button onclick="openPage('')">Open Exec (no page)</button>
+      <button class="secondary" onclick="clearExec()">Clear saved URL</button>
+    </div>
+
+    <div class="hint">
+      This opens pages in a <b>new tab</b> (no iframe) to avoid Google sandbox / 403 issues.<br/>
+      It automatically appends <code>?page=...</code> and a cache-busting <code>ts</code> param.
+    </div>
+  </div>
+
+  <script>
+    const execInput = document.getElementById("exec");
+
+    // restore last exec url
+    execInput.value = localStorage.getItem("CV_EXEC_URL") || "";
+
+    execInput.addEventListener("input", () => {
+      localStorage.setItem("CV_EXEC_URL", execInput.value.trim());
+    });
+
+    function buildUrl(page) {
+      const base = execInput.value.trim();
+      if (!base) {
+        alert("Paste your EXEC URL first.");
+        return null;
+      }
+      let url;
+      try {
+        url = new URL(base);
+      } catch (e) {
+        alert("That doesn't look like a valid URL.");
+        return null;
+      }
+
+      if (page) url.searchParams.set("page", page);
+      else url.searchParams.delete("page");
+
+      url.searchParams.set("ts", String(Date.now()));
+      return url.toString();
+    }
+
+    function openPage(page = "") {
+      const url = buildUrl(page);
+      if (!url) return;
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+
+    function clearExec() {
+      localStorage.removeItem("CV_EXEC_URL");
+      execInput.value = "";
+      execInput.focus();
+    }
+  </script>
+
+</body>
+</html>

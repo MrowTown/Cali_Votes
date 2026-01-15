@@ -1,3 +1,4 @@
+<!-- apps_script/admin.html -->
 <!doctype html>
 <html>
 <head>
@@ -5,48 +6,54 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Cali Votes — Admin</title>
   <style>
-    :root {
-      --bg: #0b0b0f;
-      --card: #141420;
-      --muted: rgba(255,255,255,.72);
-      --border: rgba(255,255,255,.12);
-      --accent: #ff2da6;
-    }
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background: var(--bg); color: #fff; }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 18px; }
-    h1 { margin: 0 0 10px; font-size: 22px; }
-    label { font-weight: 700; font-size: 12px; color: rgba(255,255,255,.8); display: block; margin-bottom: 6px; }
-    input, select, button { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: #0f0f18; color: #fff; }
-    button { cursor: pointer; border: none; background: var(--accent); color: #000; font-weight: 900; }
-    button.secondary { background: #222236; color: #fff; border: 1px solid var(--border); }
-    table { width: 100%; border-collapse: collapse; margin-top: 14px; }
-    th, td { text-align: left; padding: 10px; border-bottom: 1px solid rgba(255,255,255,.08); font-size: 13px; }
-    th { color: rgba(255,255,255,.7); font-weight: 700; }
-    .row { display: flex; gap: 12px; flex-wrap: wrap; }
-    .row > * { flex: 1; }
-    .muted { color: var(--muted); }
-    .msg { margin-top: 12px; padding: 10px 12px; border-radius: 12px; display: none; }
-    .ok { background: rgba(0,255,170,.12); border: 1px solid rgba(0,255,170,.25); }
-    .err { background: rgba(255,0,80,.12); border: 1px solid rgba(255,0,80,.25); }
-    .actions { display: flex; gap: 8px; }
-    .pill { padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.08); font-size: 12px; }
-    a { color: #7bd3ff; }
+    :root { --bg:#0b0b0f; --card:#141420; --muted:rgba(255,255,255,.72); --border:rgba(255,255,255,.12); --accent:#ff2da6; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:#fff; }
+    .wrap { max-width:1100px; margin:0 auto; padding:20px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:18px; padding:18px; }
+    h1 { margin:0 0 10px; font-size:22px; }
+    label { font-weight:700; font-size:12px; color:rgba(255,255,255,.8); display:block; margin-bottom:6px; }
+    input, select, button { width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--border); background:#0f0f18; color:#fff; }
+    button { cursor:pointer; border:none; background:var(--accent); color:#000; font-weight:900; }
+    button.secondary { background:#222236; color:#fff; border:1px solid var(--border); }
+    table { width:100%; border-collapse:collapse; margin-top:14px; }
+    th, td { text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,.08); font-size:13px; }
+    th { color:rgba(255,255,255,.7); font-weight:700; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; }
+    .row > * { flex:1; }
+    .muted { color:var(--muted); }
+    .msg { margin-top:12px; padding:10px 12px; border-radius:12px; display:none; }
+    .ok { background:rgba(0,255,170,.12); border:1px solid rgba(0,255,170,.25); }
+    .err { background:rgba(255,0,80,.12); border:1px solid rgba(255,0,80,.25); }
+    .actions { display:flex; gap:8px; }
+    .pill { padding:2px 8px; border-radius:999px; background:rgba(255,255,255,.08); font-size:12px; }
+    a { color:#7bd3ff; }
+    .topbtns { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+    .topbtns button { width:auto; padding:10px 14px; }
+    .small { font-size:12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
       <h1>Admin — Cali Votes</h1>
-      <p class="muted">Exec URL: <span id="execUrl" class="pill">loading…</span></p>
+      <p class="muted small">This page uses <span class="mono">google.script.run</span> (no CORS / no exec URL guessing).</p>
+
+      <div class="topbtns">
+        <button id="clearSaved" type="button" class="secondary">Clear saved password</button>
+        <button id="selftest" type="button" class="secondary">Selftest</button>
+      </div>
 
       <div id="msg" class="msg"></div>
 
       <div class="row" style="margin-top:12px;">
         <div>
           <label>Password</label>
-          <input id="password" type="password" placeholder="Admin password" />
+          <input id="password" type="password" placeholder="Admin password" autocomplete="current-password" />
+          <div class="muted small" style="margin-top:6px;">
+            Saved locally in this browser only (optional).
+          </div>
         </div>
         <div>
           <label>Filter</label>
@@ -86,34 +93,30 @@
   </div>
 
   <script>
-    const EXEC_URL = "<?= ScriptApp.getService().getUrl() ?>";
     const msg = document.getElementById("msg");
     const rowsEl = document.getElementById("rows");
+    const pwEl = document.getElementById("password");
+    const filterEl = document.getElementById("filter");
 
-    document.getElementById("execUrl").textContent = EXEC_URL || "unknown";
+    const LS_PW = "cali_admin_pw";
 
     function show(type, text) {
       msg.className = "msg " + (type || "");
       msg.textContent = text;
       msg.style.display = "block";
     }
+    function hideMsg() { msg.style.display = "none"; }
 
-    async function post(payload) {
-      const res = await fetch(EXEC_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload)
-      });
-      const text = await res.text();
-      try { return JSON.parse(text); } catch { return { error: text }; }
-    }
+    function getPw() { return (pwEl.value || "").trim(); }
+    function savePw(pw) { if (pw) localStorage.setItem(LS_PW, pw); }
+    function loadSavedPw() { return localStorage.getItem(LS_PW) || ""; }
+    function clearPw() { localStorage.removeItem(LS_PW); pwEl.value = ""; }
 
     function renderRows(rows) {
       if (!rows.length) {
         rowsEl.innerHTML = "<tr><td colspan=\"8\" class=\"muted\">No matching rows.</td></tr>";
         return;
       }
-
       rowsEl.innerHTML = rows.map(r => {
         const proof = r.screenshot_drive_url
           ? `<a href="${r.screenshot_drive_url}" target="_blank" rel="noopener">view</a>`
@@ -138,51 +141,111 @@
       }).join("");
     }
 
-    async function loadList() {
-      const password = document.getElementById("password").value;
-      const filter = document.getElementById("filter").value;
-      if (!password) {
-        show("err", "Password required.");
-        return;
-      }
+    function gsAdminList(filterObj) {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(err => reject(err))
+          .adminList(filterObj);
+      });
+    }
 
-      const res = await post({ action: "adminList", password, filter });
-      if (res.error) {
-        show("err", res.error);
-        return;
+    function gsAdminApprove(submissionId, notesOpt, adminPassword) {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(err => reject(err))
+          .adminApprove(submissionId, notesOpt || "", adminPassword);
+      });
+    }
+
+    function gsAdminReject(submissionId, notes, adminPassword) {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(err => reject(err))
+          .adminReject(submissionId, notes || "", adminPassword);
+      });
+    }
+
+    function gsAdminSelftest(adminPassword) {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(err => reject(err))
+          .adminSelftest(adminPassword);
+      });
+    }
+
+    async function loadList() {
+      const password = getPw();
+      const filter = filterEl.value;
+      if (!password) { show("err", "Password required."); return; }
+
+      try {
+        savePw(password);
+        const res = await gsAdminList({ password, filter });
+        if (res && res.error) { show("err", res.error); return; }
+        hideMsg();
+        renderRows((res && res.rows) ? res.rows : []);
+      } catch (e) {
+        show("err", (e && e.message) ? e.message : String(e));
       }
-      msg.style.display = "none";
-      renderRows(res.rows || []);
     }
 
     async function updateStatus(action, submissionId) {
-      const password = document.getElementById("password").value;
-      if (!password) {
-        show("err", "Password required.");
-        return;
-      }
+      const password = getPw();
+      if (!password) { show("err", "Password required."); return; }
 
       let reason = "";
       if (action === "reject") {
         reason = prompt("Reject reason (optional):", "") || "";
       }
 
-      const res = await post({ action, password, submissionId, reason });
-      if (res.error) {
-        show("err", res.error);
-        return;
+      try {
+        savePw(password);
+        let res;
+        if (action === "approve") {
+          res = await gsAdminApprove(submissionId, "", password);
+        } else {
+          res = await gsAdminReject(submissionId, reason, password);
+        }
+        if (res && res.error) { show("err", res.error); return; }
+        show("ok", "Updated.");
+        await loadList();
+      } catch (e) {
+        show("err", (e && e.message) ? e.message : String(e));
       }
-      show("ok", "Updated.");
-      await loadList();
+    }
+
+    async function selftest() {
+      try {
+        const password = getPw();
+        if (!password) { show("err", "Password required."); return; }
+        savePw(password);
+        const res = await gsAdminSelftest(password);
+        if (res && res.error) { show("err", res.error); return; }
+        show("ok", "Selftest OK.");
+      } catch (e) {
+        show("err", (e && e.message) ? e.message : String(e));
+      }
     }
 
     document.getElementById("refresh").addEventListener("click", loadList);
+    document.getElementById("selftest").addEventListener("click", selftest);
+    document.getElementById("clearSaved").addEventListener("click", () => {
+      clearPw();
+      show("ok", "Saved password cleared.");
+    });
 
     rowsEl.addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-action]");
       if (!btn) return;
       updateStatus(btn.dataset.action, btn.dataset.id);
     });
+
+    // Prefill saved pw if present
+    pwEl.value = loadSavedPw();
   </script>
 </body>
 </html>

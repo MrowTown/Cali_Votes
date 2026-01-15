@@ -22,7 +22,7 @@
   <div class="card">
     <h1>Register your email</h1>
     <p class="muted">
-      We’ll send you a verification link. No account, no password.
+      We’ll email you a 6-digit code. No account, no password.
     </p>
 
     <div id="msgOk" class="msg ok"></div>
@@ -31,8 +31,14 @@
     <form id="registerForm">
       <label class="label">Email</label>
       <input id="email" type="email" required placeholder="you@example.com" />
-      <button class="btn" type="submit" style="margin-top:12px;">Send verification link</button>
+      <button class="btn" type="submit" style="margin-top:12px;">Send code</button>
     </form>
+
+    <div id="codeBox" style="display:none; margin-top:12px;">
+      <label class="label">6-digit code</label>
+      <input id="code" type="text" placeholder="000000" inputmode="numeric" autocomplete="one-time-code" />
+      <button id="btnVerify" class="btn" type="button" style="margin-top:12px;">Verify code</button>
+    </div>
 
     <div id="sessionBox" style="display:none; margin-top:14px;">
       <p class="muted" style="margin:0 0 10px;">
@@ -54,6 +60,9 @@
     const msgErr = document.getElementById("msgErr");
     const form = document.getElementById("registerForm");
     const emailInput = document.getElementById("email");
+    const codeBox = document.getElementById("codeBox");
+    const codeInput = document.getElementById("code");
+    const btnVerify = document.getElementById("btnVerify");
     const sessionBox = document.getElementById("sessionBox");
     const who = document.getElementById("who");
     const btnContinue = document.getElementById("btnContinue");
@@ -82,10 +91,33 @@
       const email = emailInput.value.trim();
       if (!email) return show(msgErr, "Email is required.");
 
-      const res = await post("requestMagicLink", { email });
+      const res = await post("requestLoginCode", { email });
       if (res.error) return show(msgErr, "<b>Error:</b> " + esc(res.error));
 
-      show(msgOk, "Check your inbox for a verification link. Once verified, you’ll be sent to voting.");
+      codeBox.style.display = "block";
+      show(msgOk, "Code sent. Check your email for the 6-digit code.");
+    });
+
+    btnVerify.addEventListener("click", async () => {
+      msgOk.style.display = "none";
+      msgErr.style.display = "none";
+
+      const email = emailInput.value.trim();
+      const code = codeInput.value.trim();
+      if (!email) return show(msgErr, "Email is required.");
+      if (!code) return show(msgErr, "Enter the 6-digit code.");
+
+      const res = await post("verifyLoginCode", { email, code });
+      if (res.error) return show(msgErr, "<b>Error:</b> " + esc(res.error));
+
+      saveSession({
+        session_token: res.session_token,
+        email: res.email || email,
+        expires_at: res.expires_at || ""
+      });
+
+      show(msgOk, "Verified. Sending you to voting…");
+      window.location.href = "vote.html";
     });
 
     btnContinue.addEventListener("click", () => {

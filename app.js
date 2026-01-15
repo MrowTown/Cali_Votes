@@ -33,7 +33,7 @@ async function post(action, payload){
 }
 
 // -------- session storage --------
-// Session shape expected from backend verifyMagicLink:
+// Session shape expected from backend verifyLoginCode:
 // { session_token, email, name_optional, discord_handle_optional, expires_at }
 function saveSession(sessionObj){
   if (!sessionObj) return;
@@ -47,13 +47,25 @@ function saveSession(sessionObj){
 
 function getSession(){
   const session_token = localStorage.getItem("cali_session_token") || "";
+  const expires_at = localStorage.getItem("cali_expires_at") || "";
+  if (expires_at && Date.parse(expires_at) < Date.now()) {
+    clearSession();
+    return {
+      session_token: "",
+      session: "",
+      email: "",
+      name_optional: "",
+      discord_handle_optional: "",
+      expires_at: ""
+    };
+  }
   return {
     session_token,
     session: session_token,
     email: localStorage.getItem("cali_email") || "",
     name_optional: localStorage.getItem("cali_name_optional") || "",
     discord_handle_optional: localStorage.getItem("cali_discord_handle_optional") || "",
-    expires_at: localStorage.getItem("cali_expires_at") || ""
+    expires_at
   };
 }
 
@@ -65,33 +77,6 @@ function clearSession(){
     "cali_discord_handle_optional",
     "cali_expires_at"
   ].forEach(k => localStorage.removeItem(k));
-}
-
-// -------- magic link handling --------
-// Looks for ?verify=TOKEN. If present, calls verifyMagicLink and stores session.
-// Options:
-//  - onSuccessRedirect: "vote.html" (default)
-// Returns: { handled:boolean, ok:boolean, error?:string }
-async function handleMagicLinkIfPresent(opts = {}){
-  const token = qs("verify");
-  if (!token) return { handled: false, ok: true };
-
-  const origin = window.location.origin;
-
-  const res = await post("verifyMagicLink", { token, origin });
-  if (res.error) return { handled: true, ok: false, error: res.error };
-
-  // Backend may return { session: {...} } OR {...}
-  const sessionObj = res.session ? res.session : res;
-  saveSession(sessionObj);
-
-  // Clean URL
-  const cleanUrl = window.location.origin + window.location.pathname;
-  window.history.replaceState({}, document.title, cleanUrl);
-
-  const dest = opts.onSuccessRedirect || "vote.html";
-  window.location.href = dest;
-  return { handled: true, ok: true };
 }
 
 // -------- banner: "Currently logged in as X" --------

@@ -1,84 +1,634 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Cali Votes — Landing</title>
-  <link rel="stylesheet" href="style.css" />
-  <script src="config.js"></script>
-  <script src="app.js"></script>
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <style>
+    :root{
+      --bg0: rgba(0,0,0,0);
+      --bg1: rgba(8,8,14,.92);
+      --card: rgba(18,18,28,.92);
+      --border: rgba(255,255,255,.14);
+      --text: rgba(255,255,255,.95);
+      --muted: rgba(255,255,255,.74);
+      --accent: #ff2da6;
+      --good: rgba(0,255,170,.16);
+      --bad: rgba(255,0,80,.16);
+      --shadow: 0 20px 60px rgba(0,0,0,.55);
+      --radius: 22px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: var(--text);
+      /* Important for embedding over a hero image:
+         - Keep top transparent so the parent hero can show through
+         - Fade to a dark base so the card reads cleanly */
+      background: linear-gradient(to bottom, var(--bg0) 0%, rgba(0,0,0,.35) 20%, var(--bg1) 55%, var(--bg1) 100%);
+    }
+
+    /* This padding is the key “embed polish”:
+       It pushes the card below the parent hero text when embedded. */
+    .spacer {
+      height: clamp(240px, 32vh, 520px);
+    }
+
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 18px 70px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      backdrop-filter: blur(8px);
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(22px, 3.4vw, 34px);
+      letter-spacing: -0.02em;
+    }
+
+    .sub {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      margin-top: 12px;
+    }
+    .row > div { flex: 1; min-width: 220px; }
+
+    label {
+      display: block;
+      font-weight: 800;
+      font-size: 12px;
+      letter-spacing: .02em;
+      color: rgba(255,255,255,.82);
+      margin: 0 0 6px;
+    }
+
+    input, select, button {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(10,10,18,.88);
+      color: var(--text);
+      padding: 12px 14px;
+      outline: none;
+      font-size: 15px;
+    }
+
+    input::placeholder { color: rgba(255,255,255,.42); }
+
+    button {
+      border: none;
+      background: var(--accent);
+      color: #0a0a10;
+      font-weight: 900;
+      padding: 16px 18px;
+      font-size: 17px;
+      cursor: pointer;
+      transition: transform .06s ease;
+    }
+    button:active { transform: translateY(1px); }
+
+    button.secondary {
+      background: rgba(255,255,255,.08);
+      color: var(--text);
+      border: 1px solid var(--border);
+      font-weight: 800;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .top-actions button {
+      width: auto;
+      padding: 10px 14px;
+      font-size: 13px;
+      border-radius: 999px;
+    }
+
+    .msg {
+      display: none;
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      font-size: 14px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+    }
+    .msg.ok { display: block; background: var(--good); border-color: rgba(0,255,170,.26); }
+    .msg.err { display: block; background: var(--bad); border-color: rgba(255,0,80,.28); }
+    .msg.note { display: block; background: rgba(255,255,255,.06); }
+
+    .divider {
+      height: 1px;
+      background: rgba(255,255,255,.10);
+      margin: 18px 0;
+    }
+
+    .meta {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    a { color: #7bd3ff; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.05);
+      color: rgba(255,255,255,.85);
+      font-size: 12px;
+    }
+
+    .instruction-card {
+      margin: 14px 0 16px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.04);
+    }
+    .instruction-title {
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.72);
+      font-weight: 800;
+    }
+    .instruction-body {
+      margin-top: 6px;
+      font-size: 14px;
+      line-height: 1.4;
+      color: var(--muted);
+    }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 520px) {
+      .card { padding: 18px; border-radius: 18px; }
+      button { font-size: 16px; padding: 15px 16px; }
+      .spacer { height: clamp(210px, 26vh, 380px); }
+    }
+  </style>
 </head>
+
 <body>
-  <div id="sessionBanner"></div>
+  <div class="spacer" aria-hidden="true"></div>
 
-  <div style="max-width:820px;margin:24px auto;padding:18px;border-radius:16px;background:rgba(0,0,0,.06);">
-    <h1>Vote for Cali’s Tour City</h1>
+  <div class="wrap">
+    <div class="card">
+      <h1 id="title">Vote for Cali’s Tour City</h1>
+      <p class="sub" id="subtitle">Enter your email to get a 6-digit code. Verify it to continue.</p>
 
-    <p id="subhead" class="muted">Register your email to vote. You’ll get a verification link.</p>
+      <div class="instruction-card">
+        <div class="instruction-title" id="instrTitle">Step 1: Verify your email</div>
+        <div class="instruction-body" id="instrBody">
+          Enter your email to receive a 6-digit code. Paste the code to log in. Next: choose your votes.
+        </div>
+      </div>
 
-    <div id="actions" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;">
-      <button id="btnRegister" style="padding:12px 16px;border-radius:14px;border:0;font-weight:900;background:#ff2da6;color:#000;cursor:pointer;">
-        Register / Verify Email
-      </button>
-      <button id="btnUploadOnly" style="padding:12px 16px;border-radius:14px;border:1px solid rgba(0,0,0,.18);font-weight:900;background:#111;color:#fff;cursor:pointer;">
-        Already paid? Upload proof
-      </button>
+      <div class="top-actions">
+        <button id="btnChangeEmail" class="secondary hidden" type="button">Change email</button>
+        <button id="btnGoLeaderboard" class="secondary" type="button">Leaderboard</button>
+      </div>
+
+      <div id="msg" class="msg"></div>
+
+      <!-- REGISTER -->
+      <div id="viewRegister">
+        <div class="row">
+          <div>
+            <label>Email</label>
+            <input id="regEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+          </div>
+          <div style="min-width:220px;">
+            <button id="btnSendCode" type="button">Send code</button>
+          </div>
+        </div>
+
+        <div id="codeRow" class="row hidden">
+          <div>
+            <label>6-digit code</label>
+            <input id="regCode" type="text" placeholder="000000" inputmode="numeric" autocomplete="one-time-code" />
+          </div>
+          <div style="min-width:220px;">
+            <button id="btnVerifyCode" type="button">Verify code</button>
+          </div>
+        </div>
+
+        <div class="meta">
+          <span class="pill">No account. No password.</span>
+          <span class="pill">Code expires in 10 minutes</span>
+        </div>
+      </div>
+
+      <!-- VOTE -->
+      <div id="viewVote" class="hidden">
+        <div class="divider"></div>
+
+        <div class="row">
+          <div>
+            <label>City</label>
+            <input id="city" type="text" placeholder="e.g., New York" autocomplete="off" />
+          </div>
+
+          <div>
+            <label>Votes</label>
+            <input id="votes" type="number" min="1" step="1" placeholder="e.g., 10" inputmode="numeric" />
+          </div>
+
+          <div>
+            <label>Payment method</label>
+            <select id="payment">
+              <option value="">Select…</option>
+              <option value="CashApp">CashApp</option>
+              <option value="Venmo">Venmo</option>
+              <option value="PayPal">PayPal</option>
+              <option value="Crypto">Crypto</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div style="min-width:240px;">
+            <button id="btnSubmitVote" type="button">Continue to invoice</button>
+          </div>
+        </div>
+
+        <div class="meta" id="loggedMeta"></div>
+      </div>
+
+      <!-- AFTER SUBMIT -->
+      <div id="viewAfter" class="hidden">
+        <div class="divider"></div>
+
+        <p class="sub" style="margin:0 0 10px;">
+          You’re almost done. Pay the invoice, then upload your screenshot proof.
+        </p>
+
+        <div class="row">
+          <div>
+            <label>Amount due</label>
+            <div class="pill" id="amountDue">$0</div>
+          </div>
+          <div>
+            <label>Upload proof</label>
+            <a id="uploadLink" class="pill" href="#" target="_blank" rel="noopener">Open upload page</a>
+          </div>
+          <div style="min-width:240px;">
+            <button id="btnStartOver" class="secondary" type="button">Start over</button>
+          </div>
+        </div>
+
+        <div class="meta">
+          <span class="pill">Keep this tab open until you upload.</span>
+        </div>
+      </div>
+
+      <div class="meta" style="margin-top:14px;">
+        <span id="execHint" class="pill">Connected</span>
+        <span class="pill">Need another payment option? <a href="mailto:voting@ifuckfans.com">Email us</a></span>
+      </div>
     </div>
-
-    <div id="msgInfo" style="display:none;margin-top:14px;padding:10px 12px;border-radius:12px;background:rgba(0,0,0,.08);"></div>
-    <div id="msgErr" style="display:none;margin-top:14px;padding:10px 12px;border-radius:12px;background:rgba(255,0,80,.12);border:1px solid rgba(255,0,80,.25);"></div>
-
-    <p class="muted" style="margin-top:14px;font-size:13px;">
-      If you clicked a verification link, we’ll verify it and send you to voting.
-    </p>
   </div>
 
+  <!-- Config is expected to define window.CALI_VOTES = { EXEC_URL, ASSET_BASE } -->
+  <script src="./config.js"></script>
   <script>
-    mountSessionBanner();
+    (function () {
+      const $ = (id) => document.getElementById(id);
 
-    const msgInfo = document.getElementById("msgInfo");
-    const msgErr  = document.getElementById("msgErr");
-    const actions = document.getElementById("actions");
-    const subhead = document.getElementById("subhead");
+      const MSG = $("msg");
+      const VIEW_REGISTER = $("viewRegister");
+      const VIEW_VOTE = $("viewVote");
+      const VIEW_AFTER = $("viewAfter");
 
-    function showInfo(t){
-      msgInfo.textContent = t;
-      msgInfo.style.display = "block";
-    }
-    function showErr(t){
-      msgErr.textContent = t;
-      msgErr.style.display = "block";
-    }
-    function setVerifying(on){
-      if (on) {
-        actions.style.display = "none";
-        msgErr.style.display = "none";
-        msgInfo.style.display = "block";
-        msgInfo.textContent = "Verifying your email…";
-        subhead.textContent = "Hang tight — we’re verifying your link.";
-      } else {
-        actions.style.display = "flex";
-        if (!msgInfo.textContent) msgInfo.style.display = "none";
+      const BTN_CHANGE = $("btnChangeEmail");
+      const BTN_LEADER = $("btnGoLeaderboard");
+      const BTN_SEND = $("btnSendCode");
+      const BTN_VERIFY = $("btnVerifyCode");
+      const BTN_SUBMIT = $("btnSubmitVote");
+      const BTN_START_OVER = $("btnStartOver");
+
+      const REG_EMAIL = $("regEmail");
+      const REG_CODE = $("regCode");
+      const CITY = $("city");
+      const VOTES = $("votes");
+      const PAYMENT = $("payment");
+
+      const TITLE = $("title");
+      const SUBTITLE = $("subtitle");
+      const LOGGED_META = $("loggedMeta");
+      const AMOUNT_DUE = $("amountDue");
+      const UPLOAD_LINK = $("uploadLink");
+      const EXEC_HINT = $("execHint");
+      const CODE_ROW = $("codeRow");
+      const INSTR_TITLE = $("instrTitle");
+      const INSTR_BODY = $("instrBody");
+
+      const CFG = window.CALI_VOTES || {};
+      const EXEC_URL = String(CFG.EXEC_URL || "").trim();
+
+      const LS = {
+        email: "cali_email",
+        session: "cali_session_token",
+        expires: "cali_expires_at"
+      };
+
+      let codeSent = false;
+
+      function showMsg(kind, text) {
+        MSG.className = "msg " + (kind || "note");
+        MSG.textContent = text || "";
       }
-    }
-
-    (async function boot(){
-      const token = qs("verify");
-      if (token) setVerifying(true);
-
-      const r = await handleMagicLinkIfPresent({ onSuccessRedirect: "vote.html" });
-
-      if (r.handled && !r.ok) {
-        setVerifying(false);
-        showErr("That verification link is invalid or expired. Please register again.");
-      } else if (!r.handled) {
-        // Normal landing — no verify token present
-        msgInfo.style.display = "none";
+      function clearMsg() {
+        MSG.className = "msg";
+        MSG.textContent = "";
       }
+      function setHidden(el, hidden) {
+        if (!el) return;
+        el.classList.toggle("hidden", !!hidden);
+      }
+
+      function originForApi() {
+        // When embedded, this is the parent origin (e.g., https://ifuckfans.com)
+        // Must be included in Code.gs CFG.ALLOWED_ORIGINS
+        return window.location.origin;
+      }
+
+      async function api(payload) {
+        if (!EXEC_URL || !EXEC_URL.startsWith("https://")) {
+          throw new Error("Missing/invalid EXEC_URL in config.js");
+        }
+        const res = await fetch(EXEC_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payload)
+        });
+        const txt = await res.text();
+        try { return JSON.parse(txt); } catch { return { error: txt }; }
+      }
+
+      function getSession() {
+        const session = String(localStorage.getItem(LS.session) || "").trim();
+        const expiresAt = String(localStorage.getItem(LS.expires) || "").trim();
+        if (expiresAt && Date.parse(expiresAt) < Date.now()) {
+          clearSession();
+          return "";
+        }
+        return session;
+      }
+      function getEmail() {
+        return String(localStorage.getItem(LS.email) || "").trim();
+      }
+      function setSession(email, session_token, expires_at) {
+        localStorage.setItem(LS.email, String(email || ""));
+        localStorage.setItem(LS.session, String(session_token || ""));
+        if (expires_at) localStorage.setItem(LS.expires, String(expires_at));
+      }
+      function clearSession() {
+        localStorage.removeItem(LS.email);
+        localStorage.removeItem(LS.session);
+        localStorage.removeItem(LS.expires);
+      }
+
+      function setView(name) {
+        // register | vote | after
+        setHidden(VIEW_REGISTER, name !== "register");
+        setHidden(VIEW_VOTE, name !== "vote");
+        setHidden(VIEW_AFTER, name !== "after");
+
+        if (name === "register") {
+          setInstruction(
+            "Step 1: Verify your email",
+            "Enter your email to receive a 6-digit code. Paste the code to log in. Next: choose your votes."
+          );
+        } else if (name === "vote") {
+          setInstruction(
+            "Step 2: Choose your votes",
+            "Pick your city, vote count, and payment method. Next: review payment and upload proof."
+          );
+        } else {
+          setInstruction(
+            "Step 3: Pay and upload proof",
+            "Pay the amount due, then open the upload page and submit your screenshot."
+          );
+        }
+      }
+
+      function setInstruction(title, body) {
+        if (INSTR_TITLE) INSTR_TITLE.textContent = title;
+        if (INSTR_BODY) INSTR_BODY.textContent = body;
+      }
+
+      function renderLoggedIn() {
+        const email = getEmail();
+        const session = getSession();
+
+        if (email && session) {
+          TITLE.textContent = "Cast your votes";
+          SUBTITLE.textContent = "Pick a city, choose your votes, then continue to invoice.";
+          BTN_CHANGE.classList.remove("hidden");
+          LOGGED_META.innerHTML = `<span class="pill">Logged in: ${escapeHtml(email)}</span>`;
+          setView("vote");
+          clearMsg();
+        } else {
+          TITLE.textContent = "Vote for Cali’s Tour City";
+          SUBTITLE.textContent = "Enter your email to get a 6-digit code. Verify it to continue.";
+          BTN_CHANGE.classList.add("hidden");
+          LOGGED_META.innerHTML = "";
+          codeSent = false;
+          setHidden(CODE_ROW, true);
+          setView("register");
+        }
+      }
+
+      function escapeHtml(s) {
+        return String(s || "").replace(/[&<>"']/g, (c) => ({
+          "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+        }[c]));
+      }
+
+      function qs(name) {
+        const u = new URL(window.location.href);
+        return u.searchParams.get(name);
+      }
+
+      async function requestCode() {
+        const email = String(REG_EMAIL.value || "").trim().toLowerCase();
+        if (!email || !email.includes("@")) {
+          showMsg("err", "Enter a valid email.");
+          return;
+        }
+
+        showMsg("note", "Sending code…");
+
+        const out = await api({
+          action: "requestLoginCode",
+          email,
+          origin: originForApi()
+        });
+
+        if (out && out.ok) {
+          showMsg("ok", "Code sent. Check your email for a 6-digit code.");
+          codeSent = true;
+          setHidden(CODE_ROW, false);
+          return;
+        }
+
+        showMsg("err", out.error || "Could not send code.");
+      }
+
+      async function verifyCode() {
+        const email = String(REG_EMAIL.value || "").trim().toLowerCase();
+        const code = String(REG_CODE.value || "").trim();
+        if (!email || !email.includes("@")) {
+          showMsg("err", "Enter a valid email.");
+          return;
+        }
+        if (!code || code.length < 6) {
+          showMsg("err", "Enter the 6-digit code.");
+          return;
+        }
+
+        showMsg("note", "Verifying…");
+
+        const out = await api({
+          action: "verifyLoginCode",
+          email,
+          code,
+          origin: originForApi()
+        });
+
+        if (out && out.ok && out.session_token) {
+          setSession(out.email || email, out.session_token, out.expires_at);
+          showMsg("ok", "Verified. You’re logged in.");
+          renderLoggedIn();
+          return;
+        }
+
+        showMsg("err", out.error || "Verification failed. Request a new code.");
+      }
+
+      async function submitVote() {
+        const session_token = getSession();
+        const email = getEmail();
+        if (!session_token || !email) {
+          showMsg("err", "Not logged in. Please verify your email again.");
+          renderLoggedIn();
+          return;
+        }
+
+        const city = String(CITY.value || "").trim();
+        const votes_claimed = Number(String(VOTES.value || "").trim());
+        const payment_method_selected = String(PAYMENT.value || "").trim();
+
+        if (!city) return showMsg("err", "City required.");
+        if (!votes_claimed || votes_claimed <= 0) return showMsg("err", "Votes must be 1 or more.");
+        if (!payment_method_selected) return showMsg("err", "Payment method required.");
+
+        showMsg("note", "Creating invoice…");
+
+        const out = await api({
+          action: "submitVote",
+          session_token,
+          city,
+          votes_claimed,
+          payment_method_selected,
+          origin: originForApi()
+        });
+
+        if (out && out.ok && (out.upload_url || out.upload_token)) {
+          const amount = Number(out.amount_due_usd || 0);
+          AMOUNT_DUE.textContent = amount ? `$${amount}` : "$0";
+
+          // Prefer upload_url if provided; else build from token if frontend wants to
+          if (out.upload_url) {
+            UPLOAD_LINK.href = out.upload_url;
+          } else if (out.upload_token) {
+            // Fall back to hosted upload page (upload_entry.html) if your repo uses that.
+            // If your upload page is different, change this one line.
+            const base = (window.location.origin + window.location.pathname).replace(/\/[^\/]*$/, "");
+            UPLOAD_LINK.href = base + "/upload_entry.html?token=" + encodeURIComponent(out.upload_token);
+          } else {
+            UPLOAD_LINK.href = "#";
+          }
+
+          showMsg("ok", out.idem ? "Already created. Continue to upload proof." : "Invoice created. Continue to upload proof.");
+          setView("after");
+          return;
+        }
+
+        showMsg("err", out.error || "Could not create invoice.");
+      }
+
+      function goLeaderboard() {
+        // If you have a leaderboard page in your repo, adjust this.
+        // Leaving as-is to match your existing link usage.
+        window.location.href = "./vote.html#leaderboard";
+      }
+
+      function init() {
+        // Tiny health hint
+        if (!EXEC_URL) {
+          EXEC_HINT.textContent = "Missing EXEC_URL";
+        } else {
+          EXEC_HINT.textContent = "Connected";
+        }
+
+        BTN_LEADER.addEventListener("click", goLeaderboard);
+        BTN_SEND.addEventListener("click", requestCode);
+        BTN_VERIFY.addEventListener("click", verifyCode);
+        BTN_SUBMIT.addEventListener("click", submitVote);
+
+        BTN_CHANGE.addEventListener("click", () => {
+          clearSession();
+          clearMsg();
+          setHidden(CODE_ROW, true);
+          renderLoggedIn();
+        });
+
+        BTN_START_OVER.addEventListener("click", () => {
+          clearMsg();
+          setView(getSession() ? "vote" : "register");
+        });
+
+        renderLoggedIn();
+      }
+
+      init();
     })();
-
-    document.getElementById("btnRegister").addEventListener("click", () => window.location.href = "register.html");
-    document.getElementById("btnUploadOnly").addEventListener("click", () => window.location.href = "upload_entry.html");
   </script>
 </body>
 </html>
