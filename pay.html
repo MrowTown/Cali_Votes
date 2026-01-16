@@ -33,7 +33,7 @@
 
       <div class="row" style="gap:12px; margin-top:14px;">
         <button id="createSubmission" class="btn" type="button">I’ve paid — Continue to Upload</button>
-        <a class="btn secondary" href="vote.html">Back</a>
+        <a class="btn secondary" href="landing.html">Back</a>
       </div>
 
       <div class="row" style="gap:12px; margin-top:10px;">
@@ -47,45 +47,55 @@
   <script>
     const msg = document.getElementById("msg");
     const btn = document.getElementById("createSubmission");
+    const qrImg = document.getElementById("pay_qr");
+
+    const INVOICE_KEY = "cali_invoice"; // Single source of truth for invoice state (vote -> pay).
+    const INVOICE_ERROR_KEY = "cali_invoice_error";
 
     function show(type, text){
       msg.className = "msg " + (type || "");
-      msg.textContent = text;
+      msg.textContent = text || "";
+      msg.style.display = text ? "block" : "none";
     }
 
-    function loadVoteDraft(){
-      const raw = localStorage.getItem("cali_vote_payload");
+    function loadInvoice(){
+      const raw = localStorage.getItem(INVOICE_KEY);
       if (!raw) return null;
       try { return JSON.parse(raw); } catch (_) { return null; }
     }
 
-    (function boot(){
-      const s = getSession();
-      if (!s.session_token || !s.email) {
-        window.location.href = "landing.html";
-        return;
-      }
+    function saveInvoice(invoice){
+      localStorage.setItem(INVOICE_KEY, JSON.stringify(invoice));
+    }
 
-      const draft = loadVoteDraft();
-      if (!draft) {
-        show("err", "Missing vote details. Please go back and choose your votes.");
-        btn.disabled = true;
-        return;
+    function buildUploadUrl(upload_url, upload_token){
+      if (upload_url) return upload_url;
+      if (upload_token) {
+        const base = (window.location.origin + window.location.pathname).replace(/\/[^\/]*$/, "");
+        return base + "/upload.html?token=" + encodeURIComponent(upload_token);
       }
+      return "";
+    }
 
-      const city = draft.city || "";
-      const votes = Number(draft.votes_claimed || 0);
-      const payment = draft.payment_method_selected || "";
+    function buildQrSrc(file){
+      const base = cfg().ASSET_BASE.replace(/\/+$/, "");
+      if (base.toLowerCase().endsWith("/assets")) return base + "/" + file;
+      return base + "/assets/" + file;
+    }
+
+    function renderInvoice(data){
+      const city = data.city || "";
+      const votes = Number(data.votes_claimed || 0);
+      const payment = data.payment_method_selected || "";
+      const amount = Number(data.amount_due_usd || (votes * 5));
 
       if (!city || !votes || !payment) {
-        show("err", "Missing vote details. Please go back and choose your votes.");
-        btn.disabled = true;
-        return;
+        return false;
       }
 
       document.getElementById("pay_city").textContent = city;
       document.getElementById("pay_votes").textContent = String(votes);
-      document.getElementById("pay_amount").textContent = "$" + String(Math.round(votes * 5));
+      document.getElementById("pay_amount").textContent = "$" + String(Math.round(amount));
       document.getElementById("pay_method").textContent = payment;
 
       const qrMap = {
@@ -98,51 +108,62 @@
 
       const file = qrMap[payment];
       if (file) {
-        const base = cfg().ASSET_BASE.replace(/\/+$/, "");
-        const img = document.getElementById("pay_qr");
-        img.src = base + "/" + file;
-        img.style.display = "block";
+        qrImg.src = buildQrSrc(file);
+        qrImg.style.display = "block";
       } else {
         show("err", "Unknown payment method selected.");
       }
+
+      return true;
+    }
+
+    (function boot(){
+      const s = getSession();
+      if (!s.session_token || !s.email) {
+        window.location.href = "landing.html";
+        return;
+      }
+
+      const invoice = loadInvoice();
+      if (!invoice) {
+        localStorage.setItem(INVOICE_ERROR_KEY, "Missing invoice. Please generate your invoice again.");
+        window.location.href = "landing.html";
+        return;
+      }
+
+      invoice.upload_url = buildUploadUrl(invoice.upload_url || "", invoice.upload_token || "");
+      saveInvoice(invoice);
+
+      if (!renderInvoice(invoice)) {
+        localStorage.setItem(INVOICE_ERROR_KEY, "Invoice data is incomplete. Please generate your invoice again.");
+        window.location.href = "landing.html";
+        return;
+      }
+
+      if (invoice.upload_url) localStorage.setItem("cali_last_upload_url", invoice.upload_url);
     })();
 
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       btn.disabled = true;
       msg.textContent = "";
 
-      const s = getSession();
-      const draft = loadVoteDraft();
-      if (!draft || !s.session_token) {
-        show("err", "Missing session or vote details.");
+      const invoice = loadInvoice();
+      if (!invoice) {
+        show("err", "Missing invoice. Please go back and generate again.");
         btn.disabled = false;
         return;
       }
 
-      const res = await post("submitVote", {
-        session: s.session_token,
-        city: draft.city,
-        votes_claimed: draft.votes_claimed,
-        payment_method_selected: draft.payment_method_selected,
-        name_optional: draft.name_optional || "",
-        discord_handle_optional: draft.discord_handle_optional || ""
-      });
-
-      if (res.error) {
-        show("err", "Error: " + res.error);
+      const uploadUrl = buildUploadUrl(invoice.upload_url || "", invoice.upload_token || "");
+      if (!uploadUrl) {
+        show("err", "Upload link missing. Please try again.");
         btn.disabled = false;
         return;
       }
 
-      if (res.upload_url) {
-        localStorage.setItem("cali_last_upload_url", res.upload_url);
-        if (res.submissionId) localStorage.setItem("cali_last_submission_id", res.submissionId);
-        window.location.href = res.upload_url;
-        return;
-      }
-
-      show("err", "Upload link missing. Please try again.");
-      btn.disabled = false;
+      invoice.upload_url = uploadUrl;
+      saveInvoice(invoice);
+      window.location.href = uploadUrl;
     });
   </script>
   <script>mountSessionBanner();</script>

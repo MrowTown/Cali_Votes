@@ -64,7 +64,7 @@
           </select>
         </label>
 
-        <button class="btn" type="submit">Continue to Checkout</button>
+        <button id="btnSubmit" class="btn" type="submit">Continue to Checkout</button>
       </form>
 
       <div class="row" style="gap:12px; margin-top:16px;">
@@ -80,6 +80,11 @@
     const btnSwitch = document.getElementById("btnSwitch");
     const btnBack = document.getElementById("btnBack");
     const form = document.getElementById("voteForm");
+    const btnSubmit = document.getElementById("btnSubmit");
+
+    const INVOICE_KEY = "cali_invoice"; // Single source of truth for invoice state (vote -> pay).
+    const DRAFT_KEY = "cali_vote_payload";
+    const INVOICE_ERROR_KEY = "cali_invoice_error";
 
     function showErr(html){
       msgErr.innerHTML = html;
@@ -87,9 +92,22 @@
     }
 
     function loadVoteDraft(){
-      const raw = localStorage.getItem("cali_vote_payload");
+      const raw = localStorage.getItem(DRAFT_KEY);
       if (!raw) return null;
       try { return JSON.parse(raw); } catch (_) { return null; }
+    }
+
+    function saveInvoice(invoice){
+      localStorage.setItem(INVOICE_KEY, JSON.stringify(invoice));
+    }
+
+    function buildUploadUrl(upload_url, upload_token){
+      if (upload_url) return upload_url;
+      if (upload_token) {
+        const base = (window.location.origin + window.location.pathname).replace(/\/[^\/]*$/, "");
+        return base + "/upload.html?token=" + encodeURIComponent(upload_token);
+      }
+      return "";
     }
 
     (function boot(){
@@ -99,6 +117,12 @@
         return;
       }
       who.textContent = s.email;
+
+      const invoiceErr = localStorage.getItem(INVOICE_ERROR_KEY);
+      if (invoiceErr) {
+        localStorage.removeItem(INVOICE_ERROR_KEY);
+        showErr(invoiceErr);
+      }
 
       const draft = loadVoteDraft();
       if (draft) {
@@ -116,10 +140,10 @@
 
     btnSwitch.addEventListener("click", () => {
       clearSession();
-      window.location.href = "register.html";
+      window.location.href = "landing.html";
     });
 
-    form.addEventListener("submit", (e) => {
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
       msgErr.style.display = "none";
 
@@ -131,12 +155,47 @@
       if (!votes || votes <= 0) return showErr("Votes must be at least 1.");
       if (!payment) return showErr("Choose a payment method.");
 
-      const payload = {
+      const s = getSession();
+      if (!s.session_token) return showErr("Session expired. Please verify your email again.");
+
+      btnSubmit.disabled = true;
+
+      const res = await post("submitVote", {
+        session_token: s.session_token,
         city,
         votes_claimed: votes,
         payment_method_selected: payment
+      });
+
+      if (res.error) {
+        btnSubmit.disabled = false;
+        return showErr("Error: " + esc(res.error));
+      }
+
+      if (!res.ok && !res.upload_url && !res.upload_token) {
+        btnSubmit.disabled = false;
+        return showErr("Could not create invoice. Please try again.");
+      }
+
+      const uploadUrl = buildUploadUrl(res.upload_url || "", res.upload_token || "");
+      const invoice = {
+        city,
+        votes_claimed: votes,
+        payment_method_selected: payment,
+        amount_due_usd: Number(res.amount_due_usd || (votes * 5)),
+        upload_url: uploadUrl,
+        upload_token: res.upload_token || "",
+        submission_id: res.submission_id || res.submissionId || res.id || ""
       };
-      localStorage.setItem("cali_vote_payload", JSON.stringify(payload));
+
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        city,
+        votes_claimed: votes,
+        payment_method_selected: payment
+      }));
+      saveInvoice(invoice);
+      if (uploadUrl) localStorage.setItem("cali_last_upload_url", uploadUrl);
+
       window.location.href = "pay.html";
     });
   </script>
