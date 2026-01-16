@@ -275,9 +275,9 @@
               <option value="">Select…</option>
               <option value="CashApp">CashApp</option>
               <option value="Venmo">Venmo</option>
-              <option value="PayPal">PayPal</option>
-              <option value="Crypto">Crypto</option>
-              <option value="Other">Other</option>
+              <option value="SOL">SOL</option>
+              <option value="ETH">ETH</option>
+              <option value="BTC">BTC</option>
             </select>
           </div>
 
@@ -325,6 +325,7 @@
 
   <!-- Config is expected to define window.CALI_VOTES = { EXEC_URL, ASSET_BASE } -->
   <script src="./config.js"></script>
+  <script src="./app.js"></script>
   <script>
     (function () {
       const $ = (id) => document.getElementById(id);
@@ -357,17 +358,6 @@
       const INSTR_TITLE = $("instrTitle");
       const INSTR_BODY = $("instrBody");
 
-      const CFG = window.CALI_VOTES || {};
-      const EXEC_URL = String(CFG.EXEC_URL || "").trim();
-
-      const LS = {
-        email: "cali_email",
-        session: "cali_session_token",
-        expires: "cali_expires_at"
-      };
-
-      let codeSent = false;
-
       function showMsg(kind, text) {
         MSG.className = "msg " + (kind || "note");
         MSG.textContent = text || "";
@@ -379,48 +369,6 @@
       function setHidden(el, hidden) {
         if (!el) return;
         el.classList.toggle("hidden", !!hidden);
-      }
-
-      function originForApi() {
-        // When embedded, this is the parent origin (e.g., https://ifuckfans.com)
-        // Must be included in Code.gs CFG.ALLOWED_ORIGINS
-        return window.location.origin;
-      }
-
-      async function api(payload) {
-        if (!EXEC_URL || !EXEC_URL.startsWith("https://")) {
-          throw new Error("Missing/invalid EXEC_URL in config.js");
-        }
-        const res = await fetch(EXEC_URL, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(payload)
-        });
-        const txt = await res.text();
-        try { return JSON.parse(txt); } catch { return { error: txt }; }
-      }
-
-      function getSession() {
-        const session = String(localStorage.getItem(LS.session) || "").trim();
-        const expiresAt = String(localStorage.getItem(LS.expires) || "").trim();
-        if (expiresAt && Date.parse(expiresAt) < Date.now()) {
-          clearSession();
-          return "";
-        }
-        return session;
-      }
-      function getEmail() {
-        return String(localStorage.getItem(LS.email) || "").trim();
-      }
-      function setSession(email, session_token, expires_at) {
-        localStorage.setItem(LS.email, String(email || ""));
-        localStorage.setItem(LS.session, String(session_token || ""));
-        if (expires_at) localStorage.setItem(LS.expires, String(expires_at));
-      }
-      function clearSession() {
-        localStorage.removeItem(LS.email);
-        localStorage.removeItem(LS.session);
-        localStorage.removeItem(LS.expires);
       }
 
       function setView(name) {
@@ -453,14 +401,13 @@
       }
 
       function renderLoggedIn() {
-        const email = getEmail();
-        const session = getSession();
+        const s = getSession();
 
-        if (email && session) {
+        if (s.email && s.session_token) {
           TITLE.textContent = "Cast your votes";
           SUBTITLE.textContent = "Pick a city, choose your votes, then continue to invoice.";
           BTN_CHANGE.classList.remove("hidden");
-          LOGGED_META.innerHTML = `<span class="pill">Logged in: ${escapeHtml(email)}</span>`;
+          LOGGED_META.innerHTML = `<span class="pill">Logged in: ${escapeHtml(s.email)}</span>`;
           setView("vote");
           clearMsg();
         } else {
@@ -468,7 +415,6 @@
           SUBTITLE.textContent = "Enter your email to get a 6-digit code. Verify it to continue.";
           BTN_CHANGE.classList.add("hidden");
           LOGGED_META.innerHTML = "";
-          codeSent = false;
           setHidden(CODE_ROW, true);
           setView("register");
         }
@@ -480,9 +426,13 @@
         }[c]));
       }
 
-      function qs(name) {
-        const u = new URL(window.location.href);
-        return u.searchParams.get(name);
+      function buildUploadUrl(upload_url, upload_token) {
+        if (upload_url) return upload_url;
+        if (upload_token) {
+          const base = (window.location.origin + window.location.pathname).replace(/\/[^\/]*$/, "");
+          return base + "/upload.html?token=" + encodeURIComponent(upload_token);
+        }
+        return "";
       }
 
       async function requestCode() {
@@ -494,15 +444,10 @@
 
         showMsg("note", "Sending code…");
 
-        const out = await api({
-          action: "requestLoginCode",
-          email,
-          origin: originForApi()
-        });
+        const out = await post("requestLoginCode", { email });
 
         if (out && out.ok) {
           showMsg("ok", "Code sent. Check your email for a 6-digit code.");
-          codeSent = true;
           setHidden(CODE_ROW, false);
           return;
         }
@@ -524,15 +469,14 @@
 
         showMsg("note", "Verifying…");
 
-        const out = await api({
-          action: "verifyLoginCode",
-          email,
-          code,
-          origin: originForApi()
-        });
+        const out = await post("verifyLoginCode", { email, code });
 
         if (out && out.ok && out.session_token) {
-          setSession(out.email || email, out.session_token, out.expires_at);
+          saveSession({
+            session_token: out.session_token,
+            email: out.email || email,
+            expires_at: out.expires_at || ""
+          });
           showMsg("ok", "Verified. You’re logged in.");
           renderLoggedIn();
           return;
@@ -542,9 +486,8 @@
       }
 
       async function submitVote() {
-        const session_token = getSession();
-        const email = getEmail();
-        if (!session_token || !email) {
+        const s = getSession();
+        if (!s.session_token || !s.email) {
           showMsg("err", "Not logged in. Please verify your email again.");
           renderLoggedIn();
           return;
@@ -560,33 +503,39 @@
 
         showMsg("note", "Creating invoice…");
 
-        const out = await api({
-          action: "submitVote",
-          session_token,
+        const out = await post("submitVote", {
+          session_token: s.session_token,
           city,
           votes_claimed,
-          payment_method_selected,
-          origin: originForApi()
+          payment_method_selected
         });
 
         if (out && out.ok && (out.upload_url || out.upload_token)) {
-          const amount = Number(out.amount_due_usd || 0);
+          const amount = Number(out.amount_due_usd || (votes_claimed * 5));
+          const uploadUrl = buildUploadUrl(out.upload_url, out.upload_token);
+          const invoice = {
+            city,
+            votes_claimed,
+            payment_method_selected,
+            amount_due_usd: amount,
+            upload_url: uploadUrl,
+            upload_token: out.upload_token || "",
+            submission_id: out.submission_id || out.submissionId || out.id || ""
+          };
+
+          localStorage.setItem("cali_vote_payload", JSON.stringify({
+            city,
+            votes_claimed,
+            payment_method_selected
+          }));
+          localStorage.setItem("cali_invoice", JSON.stringify(invoice));
+          if (uploadUrl) localStorage.setItem("cali_last_upload_url", uploadUrl);
+
           AMOUNT_DUE.textContent = amount ? `$${amount}` : "$0";
+          UPLOAD_LINK.href = uploadUrl || "#";
 
-          // Prefer upload_url if provided; else build from token if frontend wants to
-          if (out.upload_url) {
-            UPLOAD_LINK.href = out.upload_url;
-          } else if (out.upload_token) {
-            // Fall back to hosted upload page (upload_entry.html) if your repo uses that.
-            // If your upload page is different, change this one line.
-            const base = (window.location.origin + window.location.pathname).replace(/\/[^\/]*$/, "");
-            UPLOAD_LINK.href = base + "/upload_entry.html?token=" + encodeURIComponent(out.upload_token);
-          } else {
-            UPLOAD_LINK.href = "#";
-          }
-
-          showMsg("ok", out.idem ? "Already created. Continue to upload proof." : "Invoice created. Continue to upload proof.");
-          setView("after");
+          showMsg("ok", out.idem ? "Invoice ready. Redirecting to checkout…" : "Invoice created. Redirecting to checkout…");
+          window.location.href = "pay.html";
           return;
         }
 
@@ -594,17 +543,14 @@
       }
 
       function goLeaderboard() {
-        // If you have a leaderboard page in your repo, adjust this.
-        // Leaving as-is to match your existing link usage.
-        window.location.href = "./vote.html#leaderboard";
+        window.location.href = "leaderboard.html";
       }
 
       function init() {
-        // Tiny health hint
-        if (!EXEC_URL) {
-          EXEC_HINT.textContent = "Missing EXEC_URL";
-        } else {
-          EXEC_HINT.textContent = "Connected";
+        const invoiceErr = localStorage.getItem("cali_invoice_error");
+        if (invoiceErr) {
+          localStorage.removeItem("cali_invoice_error");
+          showMsg("err", invoiceErr);
         }
 
         BTN_LEADER.addEventListener("click", goLeaderboard);
@@ -621,7 +567,7 @@
 
         BTN_START_OVER.addEventListener("click", () => {
           clearMsg();
-          setView(getSession() ? "vote" : "register");
+          setView(getSession().session_token ? "vote" : "register");
         });
 
         renderLoggedIn();
