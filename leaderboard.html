@@ -21,7 +21,17 @@
       </div>
 
       <div id="msg" class="notice" style="display:none"></div>
-      <div id="list" class="notice"></div>
+
+      <!-- Glitzy leaderboard embed (no backend/frontend workflow changes) -->
+      <div style="border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,.08);">
+        <iframe
+          src="https://glitzy-leaderboard--openarmy.replit.app/"
+          title="Cali Votes Leaderboard"
+          style="width:100%; height: 78vh; border:0; display:block;"
+          loading="lazy"
+          referrerpolicy="no-referrer"
+        ></iframe>
+      </div>
 
       <div class="footer">
         <a href="landing.html">Home</a>
@@ -29,25 +39,12 @@
     </div>
   </div>
 
-<script>
-  const msg = document.getElementById("msg");
-  const show = (type, html)=>{ msg.className="notice "+type; msg.innerHTML=html; msg.style.display="block"; };
+  <script>
+    // Keep the old notice helper in case you want to show a message later.
+    const msg = document.getElementById("msg");
+    const show = (type, html)=>{ msg.className="notice "+type; msg.innerHTML=html; msg.style.display="block"; };
+  </script>
 
-  async function load(){
-    try{
-      const { EXEC_URL } = cfg();
-      const res = await fetch(EXEC_URL+"?page=leaderboard");
-      const j = await res.json();
-      const lb = j.leaderboard || [];
-      document.getElementById("list").innerHTML = lb.length
-        ? "<ol>"+lb.map(x=>"<li><b>"+esc(x.city)+"</b> — "+esc(String(x.votes))+"</li>").join("")+"</ol>"
-        : "<span class='small'>No approved votes yet.</span>";
-    }catch(e){
-      show("err","Could not load leaderboard. Check config.js EXEC_URL.");
-    }
-  }
-  load();
-</script>
   <script>mountSessionBanner();</script>
 </body>
 </html>
