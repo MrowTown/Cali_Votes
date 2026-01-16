@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cali Votes — Leaderboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</head>
+<body>
+  <div id="sessionBanner"></div>
+
+  <div class="wrap">
+    <div class="card">
+      <h1>Leaderboard</h1>
+      <p class="small">Approved votes only.</p>
+      <div class="instruction-card">
+        <div class="instruction-title">This step</div>
+        <div class="instruction-body">See the current totals by city based on approved votes. Next: head back to vote if your city needs more support.</div>
+      </div>
+
+      <div id="msg" class="notice" style="display:none"></div>
+      <div id="list" class="notice"></div>
+
+      <div class="footer">
+        <a href="landing.html">Home</a>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const msg = document.getElementById("msg");
+  const show = (type, html)=>{ msg.className="notice "+type; msg.innerHTML=html; msg.style.display="block"; };
+
+  async function load(){
+    try{
+      const { EXEC_URL } = cfg();
+      const res = await fetch(EXEC_URL+"?page=leaderboard");
+      const j = await res.json();
+      const lb = j.leaderboard || [];
+      document.getElementById("list").innerHTML = lb.length
+        ? "<ol>"+lb.map(x=>"<li><b>"+esc(x.city)+"</b> — "+esc(String(x.votes))+"</li>").join("")+"</ol>"
+        : "<span class='small'>No approved votes yet.</span>";
+    }catch(e){
+      show("err","Could not load leaderboard. Check config.js EXEC_URL.");
+    }
+  }
+  load();
+</script>
+  <script>mountSessionBanner();</script>
+</body>
+</html>
